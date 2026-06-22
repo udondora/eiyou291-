@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <title>株価判断ダッシュボード — TradingView連携 トレンドテンプレート</title>
 <style>
 :root{
@@ -89,6 +92,20 @@ a{color:var(--ac)}
 .chk.unk .mk{background:var(--soft);color:var(--muted)}
 .chk .desc{flex:1} .chk .val{color:var(--muted);font-weight:800;font-size:12px}
 
+/* recent symbol chips */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.chip{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:900;cursor:pointer;min-height:34px}
+.chip:active{transform:translateY(1px)}
+
+/* price levels */
+.lv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lvbox{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}
+.lvbox .k{font-size:11px;color:var(--muted);font-weight:800}
+.lvbox .v{font-size:18px;font-weight:900;margin-top:2px}
+.lvbox.stop{border-color:rgba(239,68,68,.35)} .lvbox.stop .v{color:var(--ng)}
+.lvbox.tgt{border-color:rgba(34,197,94,.35)} .lvbox.tgt .v{color:var(--ok)}
+.sizebar{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+
 /* gauge bars */
 .bars{display:flex;flex-direction:column;gap:11px;margin-top:4px}
 .barrow .head{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:4px}
@@ -102,7 +119,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs">v2</div>
+  <div class="hs" style="text-align:right">v3<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -130,6 +147,7 @@ a{color:var(--ac)}
       <button id="run" class="btn">判定する</button>
       <button id="demo" class="btn alt" title="登録不要・サンプルデータで動作確認">🎬 デモ</button>
     </div>
+    <div class="chips" id="recent"></div>
 
     <div id="tdkeywrap" class="field" style="margin-top:10px;display:none">
       <label class="lbl">Twelve Data APIキー（無料登録で取得・ブラウザに保存されます）</label>
@@ -173,18 +191,36 @@ a{color:var(--ac)}
     </div>
 
     <div class="card">
-      <h2>③ トレンドテンプレート <span class="score" id="tt-score">—</span></h2>
+      <h2>③ 価格レベル（目安）</h2>
+      <div class="lv">
+        <div class="lvbox"><div class="k">現値</div><div class="v" id="lv-close">—</div></div>
+        <div class="lvbox"><div class="k">直近スイング安値(10日)</div><div class="v" id="lv-swing">—</div></div>
+        <div class="lvbox stop"><div class="k">損切り目安（採用）</div><div class="v" id="lv-stop">—</div></div>
+        <div class="lvbox"><div class="k">想定リスク（現値→損切り）</div><div class="v" id="lv-risk">—</div></div>
+        <div class="lvbox tgt"><div class="k">利確目標 2R</div><div class="v" id="lv-t2">—</div></div>
+        <div class="lvbox tgt"><div class="k">利確目標 3R</div><div class="v" id="lv-t3">—</div></div>
+      </div>
+      <div class="sizebar">
+        <div class="field"><label class="lbl">口座資金</label><input id="acct" class="t" style="width:120px" inputmode="numeric" placeholder="例 1000000"/></div>
+        <div class="field"><label class="lbl">1回のリスク%</label><input id="riskpct" class="t" style="width:90px" value="1" inputmode="decimal"/></div>
+        <div class="field"><label class="lbl">推奨株数 / 投入額</label><div class="metric" style="padding:9px 12px;min-width:160px"><div class="v" id="lv-shares" style="font-size:16px">—</div></div></div>
+      </div>
+      <div class="tiny muted" style="margin-top:8px">損切りは「スイング安値」と「現値−ATR×2」の高い方を採用（現値より下の場合）。利確は損切り幅(=1R)の2倍・3倍。あくまで機械的な目安です。</div>
+    </div>
+
+    <div class="card">
+      <h2>④ トレンドテンプレート <span class="score" id="tt-score">—</span></h2>
       <div class="tiny muted">Minervini のトレンドテンプレート8条件（中長期の上昇トレンド成立をチェック）</div>
       <div class="checklist" id="checklist"></div>
     </div>
 
     <div class="card">
-      <h2>④ ゲージ</h2>
+      <h2>⑤ ゲージ</h2>
       <div class="bars" id="bars"></div>
     </div>
 
     <div class="card">
-      <h2>⑤ 主要指標</h2>
+      <h2>⑥ 主要指標</h2>
       <div class="mgrid">
         <div class="metric"><div class="k">RS Rating(近似)</div><div class="v" id="m-rs">—</div></div>
         <div class="metric"><div class="k">% Gain From MA(21EMA)</div><div class="v" id="m-gain">—</div></div>
@@ -202,7 +238,7 @@ a{color:var(--ac)}
     </div>
 
     <div class="card">
-      <h2>⑥ チャート（TradingView）</h2>
+      <h2>⑦ チャート（TradingView）</h2>
       <div class="chartbox" id="tvchart"></div>
       <div class="tiny muted" style="margin-top:6px">チャートはTradingViewの公式埋め込みウィジェット。判定パネルは取得したOHLCVから本ツールが独自計算しています。</div>
     </div>
@@ -406,10 +442,21 @@ function judge(d){
   const advice=buildAdvice({action,trend,entry,tp,hot,gainFromMA,volX,rsi14,
     ttPass,ttEval,tt,from52high,stacked,emaUp});
 
+  // --- 価格レベル（損切り・利確・R）---
+  let swingLow=Infinity;
+  for(let i=Math.max(0,n-9);i<=n;i++) swingLow=Math.min(swingLow,d.low[i]);
+  const stopATR= atrv!=null? close-2*atrv : null;
+  let stop = stopATR!=null? Math.max(swingLow, stopATR) : swingLow; // 下方の論理的支持の高い方
+  if(!(stop<close)) stop = stopATR!=null? stopATR : close*0.95;     // 現値以上なら無効→ATR/5%
+  const riskPerShare = close-stop;
+  const riskPct = riskPerShare/close*100;
+  const levels={ swingLow, stop, stopATR, riskPerShare, riskPct,
+    target2R: close+2*riskPerShare, target3R: close+3*riskPerShare };
+
   return {
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
-    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice
+    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels
   };
 }
 
@@ -594,8 +641,31 @@ function render(sym,d,r){
   if(r.volX!=null){ const f=r.volX/3*100; h+=bar('出来高倍率（対50日平均）', r.volX.toFixed(2)+'x', f, r.volX>=CONFIG.volSurge?'':'warn'); }
   bars.innerHTML=h;
 
+  // 価格レベル
+  const L=r.levels; L.close=r.close; lastLevels=L;
+  document.getElementById('lv-close').textContent=fmt(r.close);
+  document.getElementById('lv-swing').textContent=isFinite(L.swingLow)?fmt(L.swingLow):'—';
+  document.getElementById('lv-stop').textContent=fmt(L.stop);
+  document.getElementById('lv-risk').innerHTML=`${fmt(L.riskPerShare)} <span class="muted" style="font-size:12px">(${L.riskPct.toFixed(1)}%)</span>`;
+  document.getElementById('lv-t2').textContent=fmt(L.target2R);
+  document.getElementById('lv-t3').textContent=fmt(L.target3R);
+  updateShares();
+
   const ul=document.getElementById('reasons'); ul.innerHTML='';
   r.reasons.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+}
+
+let lastLevels=null;
+function updateShares(){
+  const out=document.getElementById('lv-shares'); if(!lastLevels){ out.textContent='—'; return; }
+  const acct=parseFloat((document.getElementById('acct').value||'').replace(/[, ]/g,''));
+  const rp=parseFloat(document.getElementById('riskpct').value);
+  if(!acct||!rp||!(lastLevels.riskPerShare>0)){ out.innerHTML='<span class="muted" style="font-size:13px">口座資金を入力</span>'; return; }
+  const shares=Math.floor(acct*(rp/100)/lastLevels.riskPerShare);
+  const cost=shares*lastLevels.close;
+  out.innerHTML = shares>0
+    ? `${shares.toLocaleString()} 株 <span class="muted" style="font-size:12px">/ 投入 ${fmt(cost,0)}</span>`
+    : '<span class="warn" style="font-size:13px">リスク幅が大きく0株</span>';
 }
 
 let tvWidget=null;
@@ -649,6 +719,8 @@ async function run(){
     const r=judge(d);
     render(sym,d,r);
     renderChart(sym,exch);
+    if(source!=='csv') addRecent(sym);
+    localStorage.setItem('last_sym',sym);
     document.getElementById('result').scrollIntoView({behavior:'smooth'});
   }catch(e){
     showErr(e.message||String(e));
@@ -688,6 +760,18 @@ function runDemo(){
   document.getElementById('result').scrollIntoView({behavior:'smooth'});
 }
 
+/* 最近使った銘柄（最大8件、このブラウザに保存） */
+function getRecent(){ try{ return JSON.parse(localStorage.getItem('recent_syms')||'[]'); }catch(e){ return []; } }
+function addRecent(sym){
+  let a=getRecent().filter(s=>s!==sym); a.unshift(sym); a=a.slice(0,8);
+  localStorage.setItem('recent_syms',JSON.stringify(a)); renderRecent();
+}
+function renderRecent(){
+  const box=document.getElementById('recent'); const a=getRecent(); box.innerHTML='';
+  a.forEach(s=>{ const c=document.createElement('div'); c.className='chip'; c.textContent=s;
+    c.addEventListener('click',()=>{ document.getElementById('symbol').value=s; run(); }); box.appendChild(c); });
+}
+
 /* UI wiring */
 document.getElementById('source').addEventListener('change',e=>{
   document.getElementById('tdkeywrap').style.display = e.target.value==='twelvedata'?'flex':'none';
@@ -696,17 +780,26 @@ document.getElementById('source').addEventListener('change',e=>{
 document.getElementById('run').addEventListener('click',run);
 document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
+document.getElementById('acct').addEventListener('input',updateShares);
+document.getElementById('riskpct').addEventListener('input',updateShares);
 // 入力した瞬間にキーを保存（このブラウザのみ）。次回以降は自動復元。
 document.getElementById('tdkey').addEventListener('input',e=>{
   const v=e.target.value.trim(); if(v) localStorage.setItem('td_key',v);
 });
 (function init(){
+  // ビルド表示（キャッシュ確認用）
+  document.getElementById('build').textContent=new Date(document.lastModified).toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'});
   const k=localStorage.getItem('td_key');
   if(k){
     document.getElementById('tdkey').value=k;
     document.getElementById('source').value='twelvedata';   // キー保存済みならTwelve Dataを既定に
     document.getElementById('tdkeywrap').style.display='flex';
   }
+  const last=localStorage.getItem('last_sym'); if(last) document.getElementById('symbol').value=last;
+  // 口座資金も記憶
+  const acct=localStorage.getItem('acct'); if(acct) document.getElementById('acct').value=acct;
+  document.getElementById('acct').addEventListener('input',e=>localStorage.setItem('acct',e.target.value));
+  renderRecent();
 })();
 </script>
 </body>
