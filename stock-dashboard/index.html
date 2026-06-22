@@ -145,7 +145,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v7<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v8<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -196,7 +196,7 @@ a{color:var(--ac)}
   <div class="card">
     <h2>🔎 ウォッチリスト・スクリーニング</h2>
     <div class="tiny muted">複数銘柄をまとめて判定し、トレンドテンプレ達成数・RSで並べ替え（取得元は上の「データ取得元」を使用。Twelve Data 推奨）。</div>
-    <textarea id="wl" class="t" style="margin-top:8px" placeholder="例: NBIS, RKLB, NVDA, AAPL, PLTR, AVGO（カンマ/改行/スペース区切り・最大15）"></textarea>
+    <textarea id="wl" class="t" style="margin-top:8px" placeholder="例: NBIS, RKLB, NVDA, AAPL, PLTR（カンマ/改行/スペース区切り・最大30）">NVDA NBIS GEV LITE MU SNDK STX AAOI ASX MRVL AMAT TSEM VICR PLTR OKLO TSLA SPCX SIMO MXL MKSI FLEX NET SKM BE RKLB PL CRWV</textarea>
     <div class="row" style="margin-top:8px">
       <button id="screen" class="btn">スクリーニング</button>
       <span class="tiny muted" id="scr-status"></span>
@@ -878,11 +878,25 @@ function showErr(msg){ const e=document.getElementById('err'); e.style.display='
 function clearErr(){ const e=document.getElementById('err'); e.style.display='none'; e.textContent=''; }
 
 // 取得元に応じて1銘柄のOHLCVを取得（screeningと共用）
-async function fetchSeries(sym, source){
+// Twelve Data 無料枠(8/分)を守るレート制御。8件ごとに必要分だけ待機。
+let _tdCalls=[];
+async function tdThrottle(onWait){
+  const now=Date.now();
+  _tdCalls=_tdCalls.filter(t=>now-t<60000);
+  if(_tdCalls.length>=7){               // 余裕をもって7/分で運用
+    const wait=60000-(now-_tdCalls[0])+300;
+    if(onWait) onWait(Math.ceil(wait/1000));
+    await new Promise(r=>setTimeout(r,wait));
+    return tdThrottle(onWait);
+  }
+  _tdCalls.push(Date.now());
+}
+async function fetchSeries(sym, source, onWait){
   if(source==='twelvedata'){
     const key=document.getElementById('tdkey').value.trim();
     if(!key) throw new Error('Twelve DataのAPIキー未入力');
     localStorage.setItem('td_key',key);
+    await tdThrottle(onWait);
     return await fetchTwelve(sym,key);
   }
   if(source==='stooq') return await fetchStooq(sym);
@@ -982,26 +996,36 @@ let scrnRows=[], scrnSort={k:'ttPass',dir:-1};
 async function screen(){
   const source=document.getElementById('source').value;
   if(source==='csv'){ document.getElementById('scr-status').textContent='CSVはスクリーニング非対応。Twelve Data/Stooqを選んでください。'; return; }
-  const syms=[...new Set((document.getElementById('wl').value||'').split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))].slice(0,15);
+  const syms=[...new Set((document.getElementById('wl').value||'').split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))].slice(0,30);
   if(!syms.length){ document.getElementById('scr-status').textContent='銘柄を入力してください。'; return; }
   const btn=document.getElementById('screen'); btn.disabled=true; btn.textContent='実行中…';
   const st=document.getElementById('scr-status');
   localStorage.setItem('wl',document.getElementById('wl').value);
   let spy=null; try{ st.textContent='ベンチマーク取得中…'; spy=await getBenchmark(source);}catch(e){}
   scrnRows=[];
+  const onWait=sec=>{ st.textContent=`レート制限調整中… ${sec}秒待機（無料枠8回/分）`; };
   for(let i=0;i<syms.length;i++){
-    const sym=syms[i]; st.textContent=`取得中 ${i+1}/${syms.length}: ${sym}`;
-    try{
-      const d=await fetchSeries(sym,source);
+    const sym=syms[i];
+    const setS=()=>st.textContent=`取得中 ${i+1}/${syms.length}: ${sym}`; setS();
+    let d=null;
+    for(let attempt=0;attempt<2 && !d;attempt++){
+      try{ d=await fetchSeries(sym,source,onWait); setS(); }
+      catch(e){
+        const msg=e.message||'失敗';
+        if(attempt===0 && /limit|429|credit|多すぎ|too many/i.test(msg)){ onWait(60); await sleep(60000); setS(); continue; }
+        scrnRows.push({sym,ok:false,err:msg}); break;
+      }
+    }
+    if(d){
       d.rs= spy? rsRatingApprox(d.close,spy.close):null;
       const r=judge(d);
       scrnRows.push({sym,ok:true,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
-    }catch(e){ scrnRows.push({sym,ok:false,err:(e.message||'失敗')}); }
+    }
     renderScreen();
-    if(i<syms.length-1) await sleep(source==='twelvedata'?1200:400); // レート制限緩和
+    if(i<syms.length-1) await sleep(source==='twelvedata'?150:400);
   }
   const okN=scrnRows.filter(r=>r.ok).length;
-  st.textContent=`完了：${okN}/${syms.length} 件取得` + (okN<syms.length?'（失敗はレート制限/銘柄表記の可能性。少し待って再実行を）':'');
+  st.textContent=`完了：${okN}/${syms.length} 件取得` + (okN<syms.length?'（失敗は銘柄表記/未対応銘柄の可能性。少し待って再実行を）':'');
   btn.disabled=false; btn.textContent='スクリーニング';
 }
 function actClass(a){ return a==='買い候補'?'buy':a==='利確検討'?'tp':a==='様子見'?'wait':'hold'; }
