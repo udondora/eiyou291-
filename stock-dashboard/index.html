@@ -36,10 +36,10 @@ button.btn:active{transform:translateY(1px)}
 .tiny{font-size:11px}
 
 /* verdict header chips */
-.verdicts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.vchip{border-radius:12px;padding:10px 8px;text-align:center;border:1px solid var(--bd);background:var(--sf2)}
+.verdicts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.vchip{border-radius:12px;padding:10px 5px;text-align:center;border:1px solid var(--bd);background:var(--sf2)}
 .vchip .k{font-size:11px;color:var(--muted);font-weight:900}
-.vchip .v{font-size:18px;font-weight:900;margin-top:3px}
+.vchip .v{font-size:15px;font-weight:900;margin-top:3px;white-space:nowrap;letter-spacing:-.02em}
 .is-ok{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12)} .is-ok .v{color:var(--ok)}
 .is-ng{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.12)} .is-ng .v{color:var(--ng)}
 .is-wait{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.12)} .is-wait .v{color:var(--wait)}
@@ -140,12 +140,46 @@ a{color:var(--ac)}
 .barfill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ac),var(--teal));transition:width .4s}
 .barfill.warn{background:linear-gradient(90deg,var(--wait),#fbbf24)}
 .barfill.ng{background:linear-gradient(90deg,var(--ng),#f87171)}
+
+/* ===== スマホ最適化 ===== */
+@media (max-width:480px){
+  .wrap{padding:14px 11px 64px}
+  .card{padding:13px 12px;border-radius:14px;margin:12px 0}
+  .card h2{font-size:13.5px}
+  /* 入力欄を見やすく：銘柄/取引所は横並び、その他は全幅 */
+  .row{gap:9px}
+  #symbol,#exchange{width:100%}
+  .field{flex:1 1 46%}
+  #source,#preset{width:100% !important}
+  select.t,input.t{width:100%}
+  #run,#demo{flex:1 1 46%;min-width:0}
+  .verdicts{gap:6px}
+  .vchip{padding:9px 3px}
+  .vchip .v{font-size:14px}
+  .vchip .k{font-size:10px}
+  /* 表は少しコンパクトに＆折返し許可 */
+  table.jt{font-size:12.5px}
+  table.jt td{padding:6px 7px}
+  .headline .txt{font-size:15px}
+  .advice{font-size:12.5px}
+  .metric .v{font-size:16px}
+  .chk{font-size:12px;padding:6px 8px}
+  .chk .val{font-size:11px}
+  .lv{gap:7px}
+  .lvbox .v{font-size:16px}
+  .scrn{font-size:12px}
+  .scrn th,.scrn td{padding:6px 6px}
+}
+@media (max-width:360px){
+  .vchip .v{font-size:13px}
+  .verdicts{grid-template-columns:repeat(2,1fr)} /* 極小幅は2x2で読みやすく */
+}
 </style>
 </head>
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v10<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v11<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -755,7 +789,7 @@ function render(sym,d,r){
   setVerdict('vc-trend',r.trend);
   setVerdict('vc-entry',r.entry);
   setVerdict('vc-tp',r.tp);
-  setVerdict('vc-act',r.action);
+  setVerdict('vc-act',r.action.replace('(押し目)','')); // チップは短く（詳細はヘッドライン）
 
   document.getElementById('t-sym').textContent=sym;
   document.getElementById('t-close').textContent=fmt(r.close);
