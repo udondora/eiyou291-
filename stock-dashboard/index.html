@@ -533,7 +533,18 @@ document.getElementById('source').addEventListener('change',e=>{
 document.getElementById('run').addEventListener('click',run);
 document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
-(function init(){ const k=localStorage.getItem('td_key'); if(k) document.getElementById('tdkey').value=k; })();
+// 入力した瞬間にキーを保存（このブラウザのみ）。次回以降は自動復元。
+document.getElementById('tdkey').addEventListener('input',e=>{
+  const v=e.target.value.trim(); if(v) localStorage.setItem('td_key',v);
+});
+(function init(){
+  const k=localStorage.getItem('td_key');
+  if(k){
+    document.getElementById('tdkey').value=k;
+    document.getElementById('source').value='twelvedata';   // キー保存済みならTwelve Dataを既定に
+    document.getElementById('tdkeywrap').style.display='flex';
+  }
+})();
 </script>
 </body>
 </html>
