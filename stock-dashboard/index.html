@@ -145,7 +145,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v8<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v9<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -168,6 +168,14 @@ a{color:var(--ac)}
           <option value="stooq">Stooq（無料・キー不要）</option>
           <option value="twelvedata">Twelve Data（要APIキー）</option>
           <option value="csv">CSV貼付（TradingViewエクスポート）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">買い判定の厳しさ</label>
+        <select id="preset" class="t" style="width:150px">
+          <option value="loose">緩い（乖離も許容）</option>
+          <option value="normal" selected>標準</option>
+          <option value="strict">厳しい（押し目のみ）</option>
         </select>
       </div>
       <button id="run" class="btn">判定する</button>
@@ -307,10 +315,18 @@ const CONFIG = {
   atrLen:14, volAvgLen:50,
   gainFromMA_hot:25,      // 21EMAからの%乖離がこの値超で「過熱」
   atrMult_hot:7,          // MAからのATR乖離倍がこの値超で「伸び切り/利確」
-  gainFromMA_entryMax:12, // エントリー許容の最大%乖離（これ以下なら押し目余地）
+  gainFromMA_entryMax:12, // ブレイク許容の最大%乖離
+  pullbackMax:6,          // 21EMAからの乖離がこの値以下なら「押し目買い」圏（出来高不問）
   volSurge:1.5,           // 出来高倍率がこの値超で「出来高あり」
   rsGood:70,              // RS Rating近似がこの値以上で良好
 };
+// エントリー厳しさプリセット（買い候補をどこまで許容するか）
+const PRESETS = {
+  loose:  {pullbackMax:12, gainFromMA_entryMax:20, volSurge:1.2, gainFromMA_hot:30, atrMult_hot:9},
+  normal: {pullbackMax:6,  gainFromMA_entryMax:12, volSurge:1.5, gainFromMA_hot:25, atrMult_hot:7},
+  strict: {pullbackMax:3,  gainFromMA_entryMax:8,  volSurge:2.0, gainFromMA_hot:18, atrMult_hot:6},
+};
+function applyPreset(name){ const p=PRESETS[name]||PRESETS.normal; Object.assign(CONFIG,p); }
 
 /* ===== 指標計算 ===== */
 function ema(arr,len){
@@ -466,12 +482,16 @@ function judge(d){
   if(atrMult!=null) reasons.push(`MAからのATR乖離倍: ${atrMult.toFixed(2)}（過熱閾値${CONFIG.atrMult_hot}）`);
 
   // --- Entry ---
-  let entry='待機';
+  // 押し目買い: 21EMA近辺まで調整（出来高不問）／ブレイク買い: 乖離許容内＋出来高
+  let entry='待機', entryKind='';
   const volOK = (volX==null) ? true : volX>CONFIG.volSurge;
-  if(trend==='OK' && !hot && (gainFromMA==null || gainFromMA<=CONFIG.gainFromMA_entryMax)){
-    entry = volOK ? 'OK' : '待機';
+  const nearMA = gainFromMA!=null && gainFromMA<=CONFIG.pullbackMax;            // 押し目圏
+  const withinBreak = gainFromMA==null || gainFromMA<=CONFIG.gainFromMA_entryMax;
+  if(trend==='OK' && !hot){
+    if(nearMA){ entry='OK'; entryKind='押し目'; }
+    else if(withinBreak && volOK){ entry='OK'; entryKind='ブレイク'; }
   }
-  reasons.push(`出来高倍率: ${volX!=null?volX.toFixed(2)+'x':'—'}（伴う閾値${CONFIG.volSurge}x）`);
+  reasons.push(`押し目圏(≤${CONFIG.pullbackMax}%): ${nearMA?'○':'×'} / 出来高倍率 ${volX!=null?volX.toFixed(2)+'x':'—'}（閾値${CONFIG.volSurge}x）`);
 
   // --- 利確 ---
   let tp='待機';
@@ -481,7 +501,7 @@ function judge(d){
   let action;
   if(trend!=='OK') action='様子見';
   else if(tp==='OK') action='利確検討';
-  else if(entry==='OK') action='買い候補';
+  else if(entry==='OK') action= entryKind==='押し目'?'買い候補(押し目)':'買い候補';
   else action='保有/待機';
 
   // --- トレンドテンプレート8条件（Minervini）---
@@ -535,9 +555,11 @@ function judge(d){
 function buildAdvice(x){
   const fails=x.tt.filter(c=>c.pass===false).map(c=>c.desc);
   let head, ico, cls, body=[];
-  if(x.action==='買い候補'){
-    head='買い候補：初動の可能性'; ico='🚀'; cls='ok';
-    body.push('トレンドが成立し、過熱も限定的。<b>出来高を伴う押し目・ブレイク</b>なら打診の局面。');
+  if(x.action.indexOf('買い候補')===0){
+    const pb=x.action.indexOf('押し目')>=0;
+    head= pb?'買い候補：押し目（21EMA近辺）':'買い候補：ブレイク初動'; ico='🚀'; cls='ok';
+    body.push(pb? 'トレンド良好で価格が<b>21EMA近辺まで調整</b>。押し目買いの好機。反発確認で打診。'
+                : 'トレンドが成立し過熱も限定的。<b>出来高を伴うブレイク</b>の初動。');
     body.push('<span class="risk">リスク管理</span>：直近安値や21EMA割れを損切りラインの目安に。');
   } else if(x.action==='保有/待機'){
     head='保有／新規は待機'; ico='✋'; cls='wait';
@@ -703,7 +725,7 @@ function volHuman(n){ if(n==null) return '—'; if(n>=1e8) return (n/1e8).toFixe
 function setVerdict(id,val){
   const el=document.getElementById(id); el.className='vchip';
   let cls='is-wait';
-  if(val==='OK'||val==='買い候補') cls='is-ok';
+  if(val==='OK'||val.indexOf('買い候補')===0) cls='is-ok';
   else if(val==='NG'||val==='様子見') cls='is-ng';
   else if(val==='利確検討') cls='is-wait';
   else if(val==='保有/待機'||val==='待機') cls='is-wait';
@@ -1028,7 +1050,7 @@ async function screen(){
   st.textContent=`完了：${okN}/${syms.length} 件取得` + (okN<syms.length?'（失敗は銘柄表記/未対応銘柄の可能性。少し待って再実行を）':'');
   btn.disabled=false; btn.textContent='スクリーニング';
 }
-function actClass(a){ return a==='買い候補'?'buy':a==='利確検討'?'tp':a==='様子見'?'wait':'hold'; }
+function actClass(a){ return a.indexOf('買い候補')===0?'buy':a==='利確検討'?'tp':a==='様子見'?'wait':'hold'; }
 function renderScreen(){
   const tb=document.getElementById('scrn-body'); document.getElementById('scrn').style.display='table';
   const rows=scrnRows.slice().sort((a,b)=>{
@@ -1067,6 +1089,7 @@ document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='En
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('screen').addEventListener('click',screen);
+document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); });
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
   const k=th.dataset.k;
   if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
@@ -1090,6 +1113,8 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   const acct=localStorage.getItem('acct'); if(acct) document.getElementById('acct').value=acct;
   document.getElementById('acct').addEventListener('input',e=>localStorage.setItem('acct',e.target.value));
   const wl=localStorage.getItem('wl'); if(wl) document.getElementById('wl').value=wl;
+  const pre=localStorage.getItem('preset')||'normal';
+  document.getElementById('preset').value=pre; applyPreset(pre);
   renderRecent();
 })();
 </script>
