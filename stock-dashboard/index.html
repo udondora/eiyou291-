@@ -131,7 +131,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v5<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v6<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -575,18 +575,22 @@ function buildAdvice(x){
 // Stooq等はCORSヘッダを返さないため、直接取得→公開CORSプロキシの順にフォールバック。
 // （扱うのは公開株価データのみ。認証情報は一切送信しません）
 async function fetchText(url){
+  const enc=encodeURIComponent(url);
   const attempts=[
     url,
-    'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
-    'https://corsproxy.io/?url='+encodeURIComponent(url),
-    'https://thingproxy.freeboard.io/fetch/'+url
+    'https://api.codetabs.com/v1/proxy/?quest='+enc,
+    'https://api.allorigins.win/raw?url='+enc,
+    'https://corsproxy.io/?url='+enc,
+    'https://thingproxy.freeboard.io/fetch/'+url,
+    'https://api.allorigins.win/get?url='+enc   // 最終手段: {contents:...} を剥がす
   ];
   let lastErr;
   for(const u of attempts){
     try{
       const res=await fetch(u,{cache:'no-store'});
       if(!res.ok){ lastErr=new Error('HTTP '+res.status); continue; }
-      const t=await res.text();
+      let t=await res.text();
+      if(u.includes('/get?url=')){ try{ t=JSON.parse(t).contents; }catch(e){} }
       if(t && t.trim().length>20) return t;
       lastErr=new Error('空応答');
     }catch(e){ lastErr=e; }
