@@ -106,6 +106,18 @@ a{color:var(--ac)}
 .lvbox.tgt{border-color:rgba(34,197,94,.35)} .lvbox.tgt .v{color:var(--ok)}
 .sizebar{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
 
+/* options */
+.optsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
+.gktable,.chain{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.gktable td,.gktable th,.chain td,.chain th{border:1px solid var(--soft);padding:6px 8px;text-align:right;white-space:nowrap}
+.gktable th,.chain th{color:var(--muted);font-weight:800;background:var(--sf2)}
+.gktable td:first-child,.chain td.k{text-align:left;color:var(--muted);font-weight:800}
+.chainwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chain td.strike{text-align:center;font-weight:900;background:var(--sf2)}
+.chain tr.atm td{background:rgba(56,189,248,.12)}
+.chain td.call{color:#86efac} .chain td.put{color:#fca5a5}
+.em{font-weight:900}
+
 /* gauge bars */
 .bars{display:flex;flex-direction:column;gap:11px;margin-top:4px}
 .barrow .head{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:4px}
@@ -119,7 +131,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v3<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v4<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -238,7 +250,49 @@ a{color:var(--ac)}
     </div>
 
     <div class="card">
-      <h2>⑦ チャート（TradingView）</h2>
+      <h2>⑦ オプション分析 <span class="tag">米国株のみ</span></h2>
+      <div class="row" style="margin-top:4px">
+        <button id="optload" class="btn alt">🅾️ オプション取得</button>
+        <div class="field"><label class="lbl">限月</label>
+          <select id="opt-exp" class="t" style="width:150px"><option>—</option></select>
+        </div>
+      </div>
+      <div id="opt-err" class="tiny warn" style="margin-top:8px;display:none"></div>
+      <div id="opt-body" style="display:none">
+        <div class="optsum">
+          <div class="metric"><div class="k">原資産価格</div><div class="v" id="o-spot">—</div></div>
+          <div class="metric"><div class="k">ATM IV</div><div class="v" id="o-iv">—</div></div>
+          <div class="metric"><div class="k">期待変動(±)</div><div class="v em" id="o-em">—</div></div>
+          <div class="metric"><div class="k">想定レンジ(限月)</div><div class="v" id="o-range">—</div></div>
+          <div class="metric"><div class="k">ATMストラドル</div><div class="v" id="o-straddle">—</div></div>
+          <div class="metric"><div class="k">P/C比 (建玉 / 出来高)</div><div class="v" id="o-pc">—</div></div>
+        </div>
+        <div class="tiny muted" id="o-sent" style="margin-top:6px"></div>
+
+        <h2 style="margin-top:14px">ギリシャ指標（ATM・自前計算）</h2>
+        <table class="gktable">
+          <tr><th>　</th><th>Delta</th><th>Gamma</th><th>Theta/日</th><th>Vega/1%</th></tr>
+          <tr><td>ATM Call</td><td id="g-cd">—</td><td id="g-cg">—</td><td id="g-ct">—</td><td id="g-cv">—</td></tr>
+          <tr><td>ATM Put</td><td id="g-pd">—</td><td id="g-pg">—</td><td id="g-pt">—</td><td id="g-pv">—</td></tr>
+        </table>
+
+        <h2 style="margin-top:14px">チェーン（ATM周辺）</h2>
+        <div class="chainwrap">
+          <table class="chain">
+            <thead><tr>
+              <th>C-OI</th><th>C-Vol</th><th>C-IV</th><th>Call</th>
+              <th>行使価格</th>
+              <th>Put</th><th>P-IV</th><th>P-Vol</th><th>P-OI</th>
+            </tr></thead>
+            <tbody id="chain-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="tiny muted" style="margin-top:8px">出典: Yahoo Finance（非公式・遅延あり）をプロキシ経由で取得。IV は提供値、ギリシャ指標は IV からブラック・ショールズ(r=4%,配当0)で算出した目安です。</div>
+    </div>
+
+    <div class="card">
+      <h2>⑧ チャート（TradingView）</h2>
       <div class="chartbox" id="tvchart"></div>
       <div class="tiny muted" style="margin-top:6px">チャートはTradingViewの公式埋め込みウィジェット。判定パネルは取得したOHLCVから本ツールが独自計算しています。</div>
     </div>
@@ -309,6 +363,33 @@ function rsi(closes,len){
   }
   if(al===0) return 100;
   const rs=ag/al; return 100-100/(1+rs);
+}
+
+/* ===== ブラック・ショールズ（ギリシャ指標） ===== */
+function normPDF(x){ return Math.exp(-x*x/2)/Math.sqrt(2*Math.PI); }
+function normCDF(x){ // Abramowitz-Stegun近似
+  const t=1/(1+0.2316419*Math.abs(x));
+  const d=0.3989423*Math.exp(-x*x/2);
+  let p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
+  return x>0? 1-p : p;
+}
+function bsGreeks(type,S,K,T,r,iv){
+  if(!(S>0&&K>0&&T>0&&iv>0)) return null;
+  const sq=Math.sqrt(T);
+  const d1=(Math.log(S/K)+(r+iv*iv/2)*T)/(iv*sq);
+  const d2=d1-iv*sq;
+  const Nd1=normCDF(d1), Nd2=normCDF(d2);
+  const gamma=normPDF(d1)/(S*iv*sq);
+  const vega=S*normPDF(d1)*sq/100; // per 1% IV
+  let delta,theta;
+  if(type==='call'){
+    delta=Nd1;
+    theta=(-S*normPDF(d1)*iv/(2*sq) - r*K*Math.exp(-r*T)*Nd2)/365;
+  }else{
+    delta=Nd1-1;
+    theta=(-S*normPDF(d1)*iv/(2*sq) + r*K*Math.exp(-r*T)*normCDF(-d2))/365;
+  }
+  return {delta,gamma,theta,vega};
 }
 
 /* RS Rating近似: SPY比の複数期間加重(IBD風) を 1-99 にマップ */
@@ -522,6 +603,42 @@ async function fetchStooq(sym){
   if(text.trim().startsWith('<')||/N\/D/.test(text)) throw new Error('Stooqに該当データなし。銘柄表記を確認するか、CSV貼付をご利用ください。');
   return parseCSV(text);
 }
+/* ===== オプション（Yahoo Finance・プロキシ経由） ===== */
+async function fetchYahooOptions(sym, dateTs){
+  const base=`https://query1.finance.yahoo.com/v7/finance/options/${encodeURIComponent(sym)}`+(dateTs?`?date=${dateTs}`:'');
+  const txt=await fetchText(base);
+  let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error('オプション応答の解析に失敗'); }
+  const res=j.optionChain&&j.optionChain.result&&j.optionChain.result[0];
+  if(!res) throw new Error('オプションデータなし（銘柄/上場要確認）');
+  const price=res.quote && (res.quote.regularMarketPrice||res.quote.postMarketPrice);
+  const exps=(res.expirationDates||[]).map(ts=>({ts, label:new Date(ts*1000).toISOString().slice(0,10)}));
+  const o=res.options&&res.options[0];
+  if(!o) throw new Error('限月データなし');
+  const map=c=>({strike:c.strike,last:c.lastPrice,bid:c.bid,ask:c.ask,vol:c.volume||0,oi:c.openInterest||0,iv:c.impliedVolatility||0,itm:c.inTheMoney});
+  return { price, exps, expiry:{ts:o.expirationDate, calls:(o.calls||[]).map(map), puts:(o.puts||[]).map(map)} };
+}
+function analyzeOptions(opt){
+  const S=opt.price; const {calls,puts,ts}=opt.expiry;
+  const T=Math.max((ts*1000-Date.now())/(365*864e5), 1/365);
+  // ATM = Sに最も近い行使価格
+  const atmK = calls.reduce((a,c)=> Math.abs(c.strike-S)<Math.abs(a-S)? c.strike:a, calls[0]?calls[0].strike:S);
+  const ac=calls.find(c=>c.strike===atmK), ap=puts.find(p=>p.strike===atmK);
+  const cIV=(ac&&ac.iv>0)?ac.iv:0, pIV=(ap&&ap.iv>0)?ap.iv:0;
+  const ivCnt=(cIV>0?1:0)+(pIV>0?1:0);
+  const atmIV = ivCnt? (cIV+pIV)/ivCnt : 0;
+  const emPct = atmIV*Math.sqrt(T)*100;        // 1σ 期待変動率
+  const emAbs = S*atmIV*Math.sqrt(T);
+  const mid=c=>{ const m=(c&&c.bid&&c.ask)?(c.bid+c.ask)/2:(c?c.last:0); return m||0; };
+  const straddle = mid(ac)+mid(ap);
+  const sumOI=arr=>arr.reduce((s,c)=>s+(c.oi||0),0);
+  const sumVol=arr=>arr.reduce((s,c)=>s+(c.vol||0),0);
+  const pcOI = sumOI(calls)? sumOI(puts)/sumOI(calls) : null;
+  const pcVol = sumVol(calls)? sumVol(puts)/sumVol(calls) : null;
+  const r=0.04;
+  const gc = ac? bsGreeks('call',S,atmK,T,r,ac.iv):null;
+  const gp = ap? bsGreeks('put', S,atmK,T,r,ap.iv):null;
+  return {S,T,atmK,ac,ap,atmIV,emPct,emAbs,straddle,pcOI,pcVol,gc,gp};
+}
 async function fetchTwelve(sym,key){
   const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=400&order=ASC&apikey=${encodeURIComponent(key)}`;
   const res=await fetch(url); const j=await res.json();
@@ -668,6 +785,58 @@ function updateShares(){
     : '<span class="warn" style="font-size:13px">リスク幅が大きく0株</span>';
 }
 
+/* ===== オプション表示 ===== */
+let optData=null, optSym=null;
+function gk(v,d=3){ return v==null||isNaN(v)? '—' : v.toFixed(d); }
+function renderOptions(opt){
+  const a=analyzeOptions(opt);
+  document.getElementById('opt-body').style.display='block';
+  document.getElementById('o-spot').textContent=fmt(a.S);
+  document.getElementById('o-iv').innerHTML=`<span class="${a.atmIV>=0.8?'warn':''}">${(a.atmIV*100).toFixed(1)}%</span>`;
+  document.getElementById('o-em').textContent=`±${a.emPct.toFixed(1)}%  (±${fmt(a.emAbs)})`;
+  document.getElementById('o-range').textContent=`${fmt(a.S-a.emAbs)} 〜 ${fmt(a.S+a.emAbs)}`;
+  document.getElementById('o-straddle').textContent= a.straddle? fmt(a.straddle)+`（±${(a.straddle/a.S*100).toFixed(1)}%）`:'—';
+  document.getElementById('o-pc').textContent=`${a.pcOI!=null?a.pcOI.toFixed(2):'—'} / ${a.pcVol!=null?a.pcVol.toFixed(2):'—'}`;
+  const sent = a.pcOI==null?'' : a.pcOI>1.2?'プット優勢（弱気・ヘッジ多め）':a.pcOI<0.7?'コール優勢（強気）':'中立的';
+  document.getElementById('o-sent').textContent= sent?`センチメント: ${sent}（ATM行使価格 ${fmt(a.atmK)} / 残存 ${(a.T*365).toFixed(0)}日）`:'';
+
+  if(a.gc){ document.getElementById('g-cd').textContent=gk(a.gc.delta); document.getElementById('g-cg').textContent=gk(a.gc.gamma,4); document.getElementById('g-ct').textContent=gk(a.gc.theta); document.getElementById('g-cv').textContent=gk(a.gc.vega); }
+  if(a.gp){ document.getElementById('g-pd').textContent=gk(a.gp.delta); document.getElementById('g-pg').textContent=gk(a.gp.gamma,4); document.getElementById('g-pt').textContent=gk(a.gp.theta); document.getElementById('g-pv').textContent=gk(a.gp.vega); }
+
+  // チェーン（ATM周辺 ±7行）
+  const strikes=opt.expiry.calls.map(c=>c.strike).sort((x,y)=>x-y);
+  const ai=strikes.indexOf(a.atmK);
+  const lo=Math.max(0,ai-7), hi=Math.min(strikes.length,ai+8);
+  const cmap={},pmap={}; opt.expiry.calls.forEach(c=>cmap[c.strike]=c); opt.expiry.puts.forEach(p=>pmap[p.strike]=p);
+  const tb=document.getElementById('chain-body'); tb.innerHTML='';
+  for(let i=lo;i<hi;i++){
+    const K=strikes[i], c=cmap[K]||{}, p=pmap[K]||{};
+    const tr=document.createElement('tr'); if(K===a.atmK) tr.className='atm';
+    const num=(v,dg=2)=>v==null||v===0||isNaN(v)?'—':(+v).toLocaleString('en-US',{maximumFractionDigits:dg});
+    tr.innerHTML=
+      `<td>${num(c.oi,0)}</td><td>${num(c.vol,0)}</td><td>${c.iv?(c.iv*100).toFixed(0)+'%':'—'}</td><td class="call">${num(c.last)}</td>`+
+      `<td class="strike">${num(K)}</td>`+
+      `<td class="put">${num(p.last)}</td><td>${p.iv?(p.iv*100).toFixed(0)+'%':'—'}</td><td>${num(p.vol,0)}</td><td>${num(p.oi,0)}</td>`;
+    tb.appendChild(tr);
+  }
+}
+async function loadOptions(dateTs){
+  const sym=document.getElementById('symbol').value.trim().toUpperCase();
+  const e=document.getElementById('opt-err'); e.style.display='none';
+  const btn=document.getElementById('optload'); btn.textContent='取得中…'; btn.disabled=true;
+  try{
+    const opt=await fetchYahooOptions(sym, dateTs);
+    optData=opt; optSym=sym;
+    // 限月セレクト
+    const sel=document.getElementById('opt-exp'); sel.innerHTML='';
+    opt.exps.forEach(x=>{ const o=document.createElement('option'); o.value=x.ts; o.textContent=x.label; if(x.ts===opt.expiry.ts) o.selected=true; sel.appendChild(o); });
+    renderOptions(opt);
+  }catch(err){
+    e.style.display='block';
+    e.textContent='オプション取得に失敗：'+(err.message||err)+'（米国株のみ／プロキシ混雑時は再試行を）';
+  }finally{ btn.textContent='🅾️ オプション取得'; btn.disabled=false; }
+}
+
 let tvWidget=null;
 function renderChart(sym,exch){
   const box=document.getElementById('tvchart'); box.innerHTML='';
@@ -782,6 +951,8 @@ document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
+document.getElementById('optload').addEventListener('click',()=>loadOptions());
+document.getElementById('opt-exp').addEventListener('change',e=>{ if(optData) loadOptions(+e.target.value); });
 // 入力した瞬間にキーを保存（このブラウザのみ）。次回以降は自動復元。
 document.getElementById('tdkey').addEventListener('input',e=>{
   const v=e.target.value.trim(); if(v) localStorage.setItem('td_key',v);
