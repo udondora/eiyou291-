@@ -66,12 +66,43 @@ details summary{cursor:pointer;font-weight:800;color:var(--ac);font-size:13px}
 .reasons li{margin:3px 0}
 a{color:var(--ac)}
 .tag{display:inline-block;background:var(--soft);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:6px;color:var(--muted)}
+
+/* headline + advice */
+.headline{display:flex;align-items:center;gap:10px;margin:12px 0 4px;padding:11px 13px;border-radius:12px;border:1px solid var(--bd);background:var(--sf2);font-weight:900}
+.headline .ico{font-size:22px;line-height:1}
+.headline .txt{font-size:16px}
+.headline.ok{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.10)} .headline.ok .txt{color:var(--ok)}
+.headline.ng{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.10)} .headline.ng .txt{color:var(--ng)}
+.headline.wait{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.10)} .headline.wait .txt{color:var(--wait)}
+.advice{font-size:13px;color:var(--tx);line-height:1.7;margin-top:8px}
+.advice b{color:var(--ac)}
+.advice .risk{color:var(--wait)}
+
+/* trend-template checklist */
+.score{font-size:13px;font-weight:900;color:var(--muted)}
+.score b{font-size:20px;color:var(--ac)}
+.checklist{display:grid;grid-template-columns:1fr;gap:6px;margin-top:10px}
+.chk{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;padding:7px 10px;border-radius:9px;background:var(--sf2);border:1px solid var(--soft)}
+.chk .mk{flex:0 0 20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900}
+.chk.pass .mk{background:rgba(34,197,94,.18);color:var(--ok)} .chk.pass{border-color:rgba(34,197,94,.3)}
+.chk.fail .mk{background:rgba(239,68,68,.18);color:var(--ng)}
+.chk.unk .mk{background:var(--soft);color:var(--muted)}
+.chk .desc{flex:1} .chk .val{color:var(--muted);font-weight:800;font-size:12px}
+
+/* gauge bars */
+.bars{display:flex;flex-direction:column;gap:11px;margin-top:4px}
+.barrow .head{display:flex;justify-content:space-between;font-size:12px;font-weight:800;margin-bottom:4px}
+.barrow .head .lab{color:var(--muted)} .barrow .head .num{font-weight:900}
+.bar{height:9px;border-radius:999px;background:var(--soft);overflow:hidden}
+.barfill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ac),var(--teal));transition:width .4s}
+.barfill.warn{background:linear-gradient(90deg,var(--wait),#fbbf24)}
+.barfill.ng{background:linear-gradient(90deg,var(--ng),#f87171)}
 </style>
 </head>
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs">v1</div>
+  <div class="hs">v2</div>
 </div>
 
 <div class="wrap">
@@ -122,7 +153,9 @@ a{color:var(--ac)}
 
     <div class="card">
       <h2>② 総合判定 <span id="symlabel" class="tag"></span></h2>
-      <div class="verdicts" id="verdicts">
+      <div class="headline" id="headline"><span class="ico" id="hl-ico">—</span><span class="txt" id="hl-txt">—</span></div>
+      <div class="advice" id="advice"></div>
+      <div class="verdicts" id="verdicts" style="margin-top:12px">
         <div class="vchip" id="vc-trend"><div class="k">Trend</div><div class="v">—</div></div>
         <div class="vchip" id="vc-entry"><div class="k">Entry</div><div class="v">—</div></div>
         <div class="vchip" id="vc-tp"><div class="k">利確</div><div class="v">—</div></div>
@@ -140,14 +173,27 @@ a{color:var(--ac)}
     </div>
 
     <div class="card">
-      <h2>③ 主要指標</h2>
+      <h2>③ トレンドテンプレート <span class="score" id="tt-score">—</span></h2>
+      <div class="tiny muted">Minervini のトレンドテンプレート8条件（中長期の上昇トレンド成立をチェック）</div>
+      <div class="checklist" id="checklist"></div>
+    </div>
+
+    <div class="card">
+      <h2>④ ゲージ</h2>
+      <div class="bars" id="bars"></div>
+    </div>
+
+    <div class="card">
+      <h2>⑤ 主要指標</h2>
       <div class="mgrid">
         <div class="metric"><div class="k">RS Rating(近似)</div><div class="v" id="m-rs">—</div></div>
         <div class="metric"><div class="k">% Gain From MA(21EMA)</div><div class="v" id="m-gain">—</div></div>
         <div class="metric"><div class="k">ATR% Multiple From MA</div><div class="v" id="m-atrmult">—</div></div>
         <div class="metric"><div class="k">ATR%(14)</div><div class="v" id="m-atr">—</div></div>
+        <div class="metric"><div class="k">RSI(14)</div><div class="v" id="m-rsi">—</div></div>
         <div class="metric"><div class="k">vs SPY (1M / 3M)</div><div class="v" id="m-rsspy">—</div></div>
         <div class="metric"><div class="k">52週高値からの距離</div><div class="v" id="m-from52">—</div></div>
+        <div class="metric"><div class="k">52週安値からの上昇</div><div class="v" id="m-from52low">—</div></div>
       </div>
       <details style="margin-top:12px">
         <summary>判定の根拠を表示</summary>
@@ -156,7 +202,7 @@ a{color:var(--ac)}
     </div>
 
     <div class="card">
-      <h2>④ チャート（TradingView）</h2>
+      <h2>⑥ チャート（TradingView）</h2>
       <div class="chartbox" id="tvchart"></div>
       <div class="tiny muted" style="margin-top:6px">チャートはTradingViewの公式埋め込みウィジェット。判定パネルは取得したOHLCVから本ツールが独自計算しています。</div>
     </div>
@@ -215,6 +261,19 @@ function pctChange(arr,back){
   const i=arr.length-1; const j=i-back; if(j<0||arr[j]==null) return null;
   return (arr[i]/arr[j]-1)*100;
 }
+function rsi(closes,len){
+  if(closes.length<=len) return null;
+  let g=0,l=0;
+  for(let i=1;i<=len;i++){ const ch=closes[i]-closes[i-1]; if(ch>=0) g+=ch; else l-=ch; }
+  let ag=g/len, al=l/len;
+  for(let i=len+1;i<closes.length;i++){
+    const ch=closes[i]-closes[i-1];
+    ag=(ag*(len-1)+(ch>0?ch:0))/len;
+    al=(al*(len-1)+(ch<0?-ch:0))/len;
+  }
+  if(al===0) return 100;
+  const rs=ag/al; return 100-100/(1+rs);
+}
 
 /* RS Rating近似: SPY比の複数期間加重(IBD風) を 1-99 にマップ */
 function rsRatingApprox(closes, spyCloses){
@@ -259,6 +318,13 @@ function judge(d){
   let hi=-Infinity,lo=Infinity;
   for(let i=d.close.length-win;i<d.close.length;i++){ hi=Math.max(hi,d.high[i]); lo=Math.min(lo,d.low[i]); }
   const from52high=(close/hi-1)*100;
+  const from52low=(close/lo-1)*100;
+
+  // 追加指標
+  const rsi14=rsi(d.close,14);
+  const sma200arr=sma(d.close,CONFIG.sma3);
+  const sma200prev=sma200arr[n-21];           // 約1ヶ月前の200SMA(向き判定)
+  const sma200up=(sma200!=null&&sma200prev!=null)? sma200>sma200prev : null;
 
   // 半値返し: 直近の高値→安値の下落に対する戻り率
   let half=null;
@@ -311,11 +377,70 @@ function judge(d){
   else if(entry==='OK') action='買い候補';
   else action='保有/待機';
 
+  // --- トレンドテンプレート8条件（Minervini）---
+  const tt=[
+    {id:1, desc:'価格が150日線・200日線より上',
+      pass:(sma150!=null&&sma200!=null)?(close>sma150&&close>sma200):null,
+      val:(sma150!=null)?`終値 ${fmt(close)} / 150 ${fmt(sma150)}`:'データ不足'},
+    {id:2, desc:'150日線 > 200日線',
+      pass:(sma150!=null&&sma200!=null)?(sma150>sma200):null,
+      val:(sma200!=null)?`${fmt(sma150)} / ${fmt(sma200)}`:'データ不足'},
+    {id:3, desc:'200日線が上向き（約1ヶ月）',
+      pass:sma200up, val:(sma200!=null)?`200 ${fmt(sma200)}`:'データ不足'},
+    {id:4, desc:'50日線 > 150日線 > 200日線',
+      pass:(sma50!=null&&sma150!=null&&sma200!=null)?(sma50>sma150&&sma150>sma200):null,
+      val:(sma50!=null&&sma200!=null)?`${fmt(sma50)}/${fmt(sma150)}/${fmt(sma200)}`:'データ不足'},
+    {id:5, desc:'価格 > 50日線',
+      pass:(sma50!=null)?(close>sma50):null, val:(sma50!=null)?`50 ${fmt(sma50)}`:'データ不足'},
+    {id:6, desc:'52週安値より +30%以上',
+      pass:from52low>=30, val:`+${from52low.toFixed(0)}%`},
+    {id:7, desc:'52週高値の −25%以内',
+      pass:from52high>=-25, val:`${from52high.toFixed(0)}%`},
+    {id:8, desc:'RS Rating ≥ 70',
+      pass:(rs!=null)?(rs>=70):null, val:(rs!=null)?`RS ${rs}`:'未算出'},
+  ];
+  const ttPass=tt.filter(c=>c.pass===true).length;
+  const ttEval=tt.filter(c=>c.pass!==null).length;
+
+  // --- アドバイス文（自然文）---
+  const advice=buildAdvice({action,trend,entry,tp,hot,gainFromMA,volX,rsi14,
+    ttPass,ttEval,tt,from52high,stacked,emaUp});
+
   return {
-    close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,
-    vol,volAvg,volX,half,from52high,stacked,aboveMA,emaUp,hot,rs,
-    trend,entry,tp,action,reasons
+    close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
+    vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
+    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice
   };
+}
+
+/* 自然文アドバイス生成 */
+function buildAdvice(x){
+  const fails=x.tt.filter(c=>c.pass===false).map(c=>c.desc);
+  let head, ico, cls, body=[];
+  if(x.action==='買い候補'){
+    head='買い候補：初動の可能性'; ico='🚀'; cls='ok';
+    body.push('トレンドが成立し、過熱も限定的。<b>出来高を伴う押し目・ブレイク</b>なら打診の局面。');
+    body.push('<span class="risk">リスク管理</span>：直近安値や21EMA割れを損切りラインの目安に。');
+  } else if(x.action==='保有/待機'){
+    head='保有／新規は待機'; ico='✋'; cls='wait';
+    body.push('トレンドは良好だが、'+(x.gainFromMA!=null&&x.gainFromMA>CONFIG.gainFromMA_entryMax?'21EMAから伸びており新規は不利':'出来高など条件が未充足')+'。');
+    body.push('<b>押し目（9EMA/21EMA付近への調整）</b>を待つのが定石。保有中なら継続。');
+  } else if(x.action==='利確検討'){
+    head='過熱：利確を検討'; ico='🔥'; cls='wait';
+    body.push('移動平均から大きく乖離し過熱（'+(x.gainFromMA!=null?'+'+x.gainFromMA.toFixed(0)+'%乖離':'')+'）。');
+    body.push('<b>一部利確やトレーリングストップ</b>でリスクを圧縮する局面。新規追随は不利。');
+  } else {
+    head='様子見：トレンド未成立'; ico='⏸️'; cls='ng';
+    body.push('上昇トレンドの条件が揃っていません。新規エントリーは見送りが無難。');
+    if(fails.length) body.push('未達の主な条件：<b>'+fails.slice(0,3).join(' / ')+'</b>');
+    body.push('価格が9EMA>21EMAで並び、主要MAを回復するまで待機を推奨。');
+  }
+  if(x.rsi14!=null){
+    if(x.rsi14>=80) body.push('RSI '+x.rsi14.toFixed(0)+'：短期は買われ過ぎ圏。');
+    else if(x.rsi14<=30) body.push('RSI '+x.rsi14.toFixed(0)+'：売られ過ぎ圏。反発の有無に注目。');
+  }
+  body.push('トレンドテンプレート達成 <b>'+x.ttPass+'/'+x.ttEval+'</b> 条件。');
+  return {head,ico,cls,html:body.join('<br>')};
 }
 
 /* ===== データ取得 ===== */
@@ -403,9 +528,20 @@ function setPill(id,state,text){
   el.innerHTML=`<span class="pill ${state}">${text}</span>`;
 }
 
+function bar(lab,numHtml,pctFill,cls){
+  return `<div class="barrow"><div class="head"><span class="lab">${lab}</span><span class="num">${numHtml}</span></div>`
+    +`<div class="bar"><div class="barfill ${cls||''}" style="width:${Math.max(0,Math.min(100,pctFill))}%"></div></div></div>`;
+}
 function render(sym,d,r){
   document.getElementById('result').style.display='block';
   document.getElementById('symlabel').textContent=sym;
+
+  // headline + advice
+  const hl=document.getElementById('headline'); hl.className='headline '+r.advice.cls;
+  document.getElementById('hl-ico').textContent=r.advice.ico;
+  document.getElementById('hl-txt').textContent=r.advice.head;
+  document.getElementById('advice').innerHTML=r.advice.html;
+
   setVerdict('vc-trend',r.trend);
   setVerdict('vc-entry',r.entry);
   setVerdict('vc-tp',r.tp);
@@ -428,8 +564,35 @@ function render(sym,d,r){
   document.getElementById('m-gain').innerHTML= `<span class="${r.gainFromMA>CONFIG.gainFromMA_hot?'warn':'pos'}">${pct(r.gainFromMA)}</span>`;
   document.getElementById('m-atrmult').innerHTML= r.atrMult!=null? `<span class="${r.atrMult>CONFIG.atrMult_hot?'warn':''}">${r.atrMult.toFixed(2)}</span>`:'—';
   document.getElementById('m-atr').textContent= r.atrPct!=null? r.atrPct.toFixed(2)+'%':'—';
+  document.getElementById('m-rsi').innerHTML= r.rsi14!=null? `<span class="${r.rsi14>=80?'warn':(r.rsi14<=30?'neg':'')}">${r.rsi14.toFixed(0)}</span>`:'—';
   document.getElementById('m-rsspy').textContent= (d.rsSpy1!=null? pct(d.rsSpy1):'—')+' / '+(d.rsSpy3!=null? pct(d.rsSpy3):'—');
   document.getElementById('m-from52').innerHTML=`<span class="${r.from52high>-8?'pos':'warn'}">${pct(r.from52high)}</span>`;
+  document.getElementById('m-from52low').innerHTML= isFinite(r.from52low)? `<span class="${r.from52low>=30?'pos':'warn'}">${pct(r.from52low)}</span>`:'—';
+
+  // トレンドテンプレート チェックリスト
+  document.getElementById('tt-score').innerHTML=`<b>${r.ttPass}</b> / ${r.ttEval} 条件`;
+  const cl=document.getElementById('checklist'); cl.innerHTML='';
+  r.tt.forEach(c=>{
+    const st = c.pass===true?'pass':(c.pass===false?'fail':'unk');
+    const mk = c.pass===true?'✓':(c.pass===false?'×':'—');
+    const div=document.createElement('div'); div.className='chk '+st;
+    div.innerHTML=`<span class="mk">${mk}</span><span class="desc">${c.id}. ${c.desc}</span><span class="val">${c.val}</span>`;
+    cl.appendChild(div);
+  });
+
+  // ゲージ
+  const bars=document.getElementById('bars'); let h='';
+  if(r.rs!=null) h+=bar('RS Rating（相対強さ）', r.rs, r.rs, r.rs>=70?'':'warn');
+  // %乖離：0〜過熱閾値で満タン
+  if(r.gainFromMA!=null){ const f=r.gainFromMA/CONFIG.gainFromMA_hot*100; h+=bar('21EMAからの乖離（過熱度）', pct(r.gainFromMA), f, r.gainFromMA>CONFIG.gainFromMA_hot?'ng':(r.gainFromMA>CONFIG.gainFromMA_entryMax?'warn':'')); }
+  // 52週レンジ内の位置（安値0%〜高値100%）
+  if(isFinite(r.from52low)&&isFinite(r.from52high)){
+    const span=r.from52low-r.from52high; const posPct= span>0? (r.from52low/span)*100 : 100;
+    h+=bar('52週レンジ内の位置', `高値まで ${pct(r.from52high)}`, posPct, posPct>=75?'':'warn');
+  }
+  if(r.rsi14!=null) h+=bar('RSI(14)', r.rsi14.toFixed(0), r.rsi14, r.rsi14>=80?'ng':(r.rsi14<=30?'warn':''));
+  if(r.volX!=null){ const f=r.volX/3*100; h+=bar('出来高倍率（対50日平均）', r.volX.toFixed(2)+'x', f, r.volX>=CONFIG.volSurge?'':'warn'); }
+  bars.innerHTML=h;
 
   const ul=document.getElementById('reasons'); ul.innerHTML='';
   r.reasons.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
