@@ -92,6 +92,20 @@ a{color:var(--ac)}
 .chk.unk .mk{background:var(--soft);color:var(--muted)}
 .chk .desc{flex:1} .chk .val{color:var(--muted);font-weight:800;font-size:12px}
 
+/* screening table */
+.scrn{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.scrn th,.scrn td{border:1px solid var(--soft);padding:7px 8px;text-align:center;white-space:nowrap}
+.scrn th{color:var(--muted);font-weight:800;background:var(--sf2);cursor:pointer}
+.scrn td.sym{font-weight:900;text-align:left}
+.scrn tr.bad td{color:var(--muted)}
+.scrn .b{font-weight:900}
+.scrwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.act{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:900}
+.act.buy{background:rgba(34,197,94,.16);color:var(--ok)}
+.act.hold{background:rgba(245,158,11,.16);color:var(--wait)}
+.act.tp{background:rgba(245,158,11,.16);color:var(--wait)}
+.act.wait{background:rgba(239,68,68,.16);color:var(--ng)}
+
 /* recent symbol chips */
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .chip{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:900;cursor:pointer;min-height:34px}
@@ -131,7 +145,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v6<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v7<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -176,6 +190,24 @@ a{color:var(--ac)}
       ⚠️ 本ツールはトレンドテンプレートの機械的判定を可視化するものです。投資判断・売買の最終責任はご自身にあります（投資助言ではありません）。
     </div>
     <div id="err" class="err"></div>
+  </div>
+
+  <!-- ウォッチリスト・スクリーニング -->
+  <div class="card">
+    <h2>🔎 ウォッチリスト・スクリーニング</h2>
+    <div class="tiny muted">複数銘柄をまとめて判定し、トレンドテンプレ達成数・RSで並べ替え（取得元は上の「データ取得元」を使用。Twelve Data 推奨）。</div>
+    <textarea id="wl" class="t" style="margin-top:8px" placeholder="例: NBIS, RKLB, NVDA, AAPL, PLTR, AVGO（カンマ/改行/スペース区切り・最大15）"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="screen" class="btn">スクリーニング</button>
+      <span class="tiny muted" id="scr-status"></span>
+    </div>
+    <div class="scrwrap"><table class="scrn" id="scrn" style="display:none">
+      <thead><tr>
+        <th data-k="sym">銘柄</th><th data-k="action">行動</th><th data-k="ttPass">条件</th>
+        <th data-k="rs">RS</th><th data-k="gain">21EMA乖離</th><th data-k="close">終値</th>
+      </tr></thead>
+      <tbody id="scrn-body"></tbody>
+    </table></div>
   </div>
 
   <!-- 判定結果 -->
@@ -250,49 +282,7 @@ a{color:var(--ac)}
     </div>
 
     <div class="card">
-      <h2>⑦ オプション分析 <span class="tag">米国株のみ</span></h2>
-      <div class="row" style="margin-top:4px">
-        <button id="optload" class="btn alt">🅾️ オプション取得</button>
-        <div class="field"><label class="lbl">限月</label>
-          <select id="opt-exp" class="t" style="width:150px"><option>—</option></select>
-        </div>
-      </div>
-      <div id="opt-err" class="tiny warn" style="margin-top:8px;display:none"></div>
-      <div id="opt-body" style="display:none">
-        <div class="optsum">
-          <div class="metric"><div class="k">原資産価格</div><div class="v" id="o-spot">—</div></div>
-          <div class="metric"><div class="k">ATM IV</div><div class="v" id="o-iv">—</div></div>
-          <div class="metric"><div class="k">期待変動(±)</div><div class="v em" id="o-em">—</div></div>
-          <div class="metric"><div class="k">想定レンジ(限月)</div><div class="v" id="o-range">—</div></div>
-          <div class="metric"><div class="k">ATMストラドル</div><div class="v" id="o-straddle">—</div></div>
-          <div class="metric"><div class="k">P/C比 (建玉 / 出来高)</div><div class="v" id="o-pc">—</div></div>
-        </div>
-        <div class="tiny muted" id="o-sent" style="margin-top:6px"></div>
-
-        <h2 style="margin-top:14px">ギリシャ指標（ATM・自前計算）</h2>
-        <table class="gktable">
-          <tr><th>　</th><th>Delta</th><th>Gamma</th><th>Theta/日</th><th>Vega/1%</th></tr>
-          <tr><td>ATM Call</td><td id="g-cd">—</td><td id="g-cg">—</td><td id="g-ct">—</td><td id="g-cv">—</td></tr>
-          <tr><td>ATM Put</td><td id="g-pd">—</td><td id="g-pg">—</td><td id="g-pt">—</td><td id="g-pv">—</td></tr>
-        </table>
-
-        <h2 style="margin-top:14px">チェーン（ATM周辺）</h2>
-        <div class="chainwrap">
-          <table class="chain">
-            <thead><tr>
-              <th>C-OI</th><th>C-Vol</th><th>C-IV</th><th>Call</th>
-              <th>行使価格</th>
-              <th>Put</th><th>P-IV</th><th>P-Vol</th><th>P-OI</th>
-            </tr></thead>
-            <tbody id="chain-body"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="tiny muted" style="margin-top:8px">出典: CBOE/Yahoo（遅延あり）をプロキシ経由で取得。IV は提供値、ギリシャ指標は IV からブラック・ショールズ(r=4%,配当0)で算出した目安です。</div>
-    </div>
-
-    <div class="card">
-      <h2>⑧ チャート（TradingView）</h2>
+      <h2>⑦ チャート（TradingView）</h2>
       <div class="chartbox" id="tvchart"></div>
       <div class="tiny muted" style="margin-top:6px">チャートはTradingViewの公式埋め込みウィジェット。判定パネルは取得したOHLCVから本ツールが独自計算しています。</div>
     </div>
@@ -887,6 +877,26 @@ function renderChart(sym,exch){
 function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.textContent='エラー: '+msg; }
 function clearErr(){ const e=document.getElementById('err'); e.style.display='none'; e.textContent=''; }
 
+// 取得元に応じて1銘柄のOHLCVを取得（screeningと共用）
+async function fetchSeries(sym, source){
+  if(source==='twelvedata'){
+    const key=document.getElementById('tdkey').value.trim();
+    if(!key) throw new Error('Twelve DataのAPIキー未入力');
+    localStorage.setItem('td_key',key);
+    return await fetchTwelve(sym,key);
+  }
+  if(source==='stooq') return await fetchStooq(sym);
+  throw new Error('CSVは単体判定のみ対応');
+}
+// SPYベンチマークを10分キャッシュ（RS計算用・API節約）
+let _spyCache={data:null,ts:0,source:''};
+async function getBenchmark(source){
+  if(source==='csv') return null;
+  if(_spyCache.data && _spyCache.source===source && Date.now()-_spyCache.ts<6e5) return _spyCache.data;
+  const spy=await fetchSeries('SPY',source);
+  _spyCache={data:spy,ts:Date.now(),source}; return spy;
+}
+
 async function run(){
   clearErr();
   const sym=document.getElementById('symbol').value.trim().toUpperCase();
@@ -896,26 +906,18 @@ async function run(){
   const btn=document.getElementById('run'); btn.textContent='取得中…'; btn.disabled=true;
   try{
     let d;
-    if(source==='stooq') d=await fetchStooq(sym);
-    else if(source==='twelvedata'){
-      const key=document.getElementById('tdkey').value.trim();
-      if(!key) throw new Error('Twelve DataのAPIキーを入力してください');
-      localStorage.setItem('td_key',key);
-      d=await fetchTwelve(sym,key);
-    } else {
-      d=parseCSV(document.getElementById('csv').value);
-    }
+    if(source==='csv') d=parseCSV(document.getElementById('csv').value);
+    else d=await fetchSeries(sym,source);
 
     // SPY（ベンチマーク）で RS を計算。失敗してもRSなしで継続。
     d.rs=null; d.rsSpy1=null; d.rsSpy3=null;
     try{
-      let spy;
-      if(source==='twelvedata') spy=await fetchTwelve('SPY',document.getElementById('tdkey').value.trim());
-      else spy=await fetchStooq('spy');
-      d.rs=rsRatingApprox(d.close, spy.close);
-      // 期間揃え（末尾基準で概算）
-      d.rsSpy1=(pctChange(d.close,21)??0)-(pctChange(spy.close,21)??0);
-      d.rsSpy3=(pctChange(d.close,63)??0)-(pctChange(spy.close,63)??0);
+      const spy=await getBenchmark(source);
+      if(spy){
+        d.rs=rsRatingApprox(d.close, spy.close);
+        d.rsSpy1=(pctChange(d.close,21)??0)-(pctChange(spy.close,21)??0);
+        d.rsSpy3=(pctChange(d.close,63)??0)-(pctChange(spy.close,63)??0);
+      }
     }catch(e){ /* RSなしで継続 */ }
 
     const r=judge(d);
@@ -974,6 +976,62 @@ function renderRecent(){
     c.addEventListener('click',()=>{ document.getElementById('symbol').value=s; run(); }); box.appendChild(c); });
 }
 
+/* ===== スクリーニング ===== */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let scrnRows=[], scrnSort={k:'ttPass',dir:-1};
+async function screen(){
+  const source=document.getElementById('source').value;
+  if(source==='csv'){ document.getElementById('scr-status').textContent='CSVはスクリーニング非対応。Twelve Data/Stooqを選んでください。'; return; }
+  const syms=[...new Set((document.getElementById('wl').value||'').split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))].slice(0,15);
+  if(!syms.length){ document.getElementById('scr-status').textContent='銘柄を入力してください。'; return; }
+  const btn=document.getElementById('screen'); btn.disabled=true; btn.textContent='実行中…';
+  const st=document.getElementById('scr-status');
+  localStorage.setItem('wl',document.getElementById('wl').value);
+  let spy=null; try{ st.textContent='ベンチマーク取得中…'; spy=await getBenchmark(source);}catch(e){}
+  scrnRows=[];
+  for(let i=0;i<syms.length;i++){
+    const sym=syms[i]; st.textContent=`取得中 ${i+1}/${syms.length}: ${sym}`;
+    try{
+      const d=await fetchSeries(sym,source);
+      d.rs= spy? rsRatingApprox(d.close,spy.close):null;
+      const r=judge(d);
+      scrnRows.push({sym,ok:true,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
+    }catch(e){ scrnRows.push({sym,ok:false,err:(e.message||'失敗')}); }
+    renderScreen();
+    if(i<syms.length-1) await sleep(source==='twelvedata'?1200:400); // レート制限緩和
+  }
+  const okN=scrnRows.filter(r=>r.ok).length;
+  st.textContent=`完了：${okN}/${syms.length} 件取得` + (okN<syms.length?'（失敗はレート制限/銘柄表記の可能性。少し待って再実行を）':'');
+  btn.disabled=false; btn.textContent='スクリーニング';
+}
+function actClass(a){ return a==='買い候補'?'buy':a==='利確検討'?'tp':a==='様子見'?'wait':'hold'; }
+function renderScreen(){
+  const tb=document.getElementById('scrn-body'); document.getElementById('scrn').style.display='table';
+  const rows=scrnRows.slice().sort((a,b)=>{
+    if(a.ok!==b.ok) return a.ok?-1:1;
+    const k=scrnSort.k; let x=a[k],y=b[k];
+    if(k==='sym'){ return scrnSort.dir*String(x).localeCompare(String(y)); }
+    x=(x==null||isNaN(x))?-Infinity:x; y=(y==null||isNaN(y))?-Infinity:y;
+    return scrnSort.dir*(x-y);
+  });
+  tb.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    if(!r.ok){ tr.className='bad'; tr.innerHTML=`<td class="sym">${r.sym}</td><td colspan="5" style="text-align:left">取得失敗: ${r.err}</td>`; tb.appendChild(tr); return; }
+    tr.innerHTML=
+      `<td class="sym"><a href="#" data-sym="${r.sym}" class="jump">${r.sym}</a></td>`+
+      `<td><span class="act ${actClass(r.action)}">${r.action}</span></td>`+
+      `<td class="b">${r.ttPass}/${r.ttEval}</td>`+
+      `<td class="b ${r.rs>=70?'pos':(r.rs!=null?'warn':'')}">${r.rs!=null?r.rs:'—'}</td>`+
+      `<td class="${r.gain>CONFIG.gainFromMA_hot?'warn':''}">${pct(r.gain)}</td>`+
+      `<td>${fmt(r.close)}</td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('a.jump').forEach(a=>a.addEventListener('click',e=>{
+    e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run();
+  }));
+}
+
 /* UI wiring */
 document.getElementById('source').addEventListener('change',e=>{
   document.getElementById('tdkeywrap').style.display = e.target.value==='twelvedata'?'flex':'none';
@@ -984,8 +1042,12 @@ document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
-document.getElementById('optload').addEventListener('click',()=>loadOptions());
-document.getElementById('opt-exp').addEventListener('change',e=>{ if(optData) loadOptions(+e.target.value); });
+document.getElementById('screen').addEventListener('click',screen);
+document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
+  const k=th.dataset.k;
+  if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
+  renderScreen();
+}));
 // 入力した瞬間にキーを保存（このブラウザのみ）。次回以降は自動復元。
 document.getElementById('tdkey').addEventListener('input',e=>{
   const v=e.target.value.trim(); if(v) localStorage.setItem('td_key',v);
@@ -1003,6 +1065,7 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   // 口座資金も記憶
   const acct=localStorage.getItem('acct'); if(acct) document.getElementById('acct').value=acct;
   document.getElementById('acct').addEventListener('input',e=>localStorage.setItem('acct',e.target.value));
+  const wl=localStorage.getItem('wl'); if(wl) document.getElementById('wl').value=wl;
   renderRecent();
 })();
 </script>
