@@ -97,6 +97,7 @@ a{color:var(--ac)}
         </select>
       </div>
       <button id="run" class="btn">判定する</button>
+      <button id="demo" class="btn alt" title="登録不要・サンプルデータで動作確認">🎬 デモ</button>
     </div>
 
     <div id="tdkeywrap" class="field" style="margin-top:10px;display:none">
@@ -493,12 +494,44 @@ async function run(){
   }
 }
 
+/* デモ：登録不要のサンプルデータで判定を表示（上昇トレンド銘柄を生成） */
+function genDemo(){
+  const n=260, o={time:[],open:[],high:[],low:[],close:[],volume:[]};
+  let p=90; const start=new Date(); start.setDate(start.getDate()-n);
+  for(let i=0;i<n;i++){
+    const drift = i<200? 0.004 : 0.011;            // 後半で加速（やや過熱気味）
+    p *= (1 + drift + Math.sin(i/6)*0.006);
+    const c=p, op=c*(0.99+Math.random()*0.01), h=Math.max(op,c)*1.015, l=Math.min(op,c)*0.985;
+    const vol=Math.round(1e6*(1+(i>255?2.2:0.3*Math.random())));
+    const d=new Date(start.getTime()+i*86400000).toISOString().slice(0,10);
+    o.time.push(d); o.open.push(+op.toFixed(2)); o.high.push(+h.toFixed(2));
+    o.low.push(+l.toFixed(2)); o.close.push(+c.toFixed(2)); o.volume.push(vol);
+  }
+  return o;
+}
+function runDemo(){
+  clearErr();
+  const d=genDemo();
+  // SPYも擬似生成してRSを計算
+  const spy={close:[]}; let s=400; for(let i=0;i<260;i++){ s*=1.0004; spy.close.push(s); }
+  d.rs=rsRatingApprox(d.close,spy.close);
+  d.rsSpy1=(pctChange(d.close,21)??0)-(pctChange(spy.close,21)??0);
+  d.rsSpy3=(pctChange(d.close,63)??0)-(pctChange(spy.close,63)??0);
+  const r=judge(d);
+  render('DEMO',d,r);
+  document.getElementById('symlabel').textContent='DEMO（サンプルデータ）';
+  renderChart(document.getElementById('symbol').value.trim().toUpperCase()||'NBIS',
+              document.getElementById('exchange').value.trim().toUpperCase());
+  document.getElementById('result').scrollIntoView({behavior:'smooth'});
+}
+
 /* UI wiring */
 document.getElementById('source').addEventListener('change',e=>{
   document.getElementById('tdkeywrap').style.display = e.target.value==='twelvedata'?'flex':'none';
   document.getElementById('csvwrap').style.display = e.target.value==='csv'?'block':'none';
 });
 document.getElementById('run').addEventListener('click',run);
+document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
 (function init(){ const k=localStorage.getItem('td_key'); if(k) document.getElementById('tdkey').value=k; })();
 </script>
