@@ -131,7 +131,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v4<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v5<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -288,7 +288,7 @@ a{color:var(--ac)}
           </table>
         </div>
       </div>
-      <div class="tiny muted" style="margin-top:8px">出典: Yahoo Finance（非公式・遅延あり）をプロキシ経由で取得。IV は提供値、ギリシャ指標は IV からブラック・ショールズ(r=4%,配当0)で算出した目安です。</div>
+      <div class="tiny muted" style="margin-top:8px">出典: CBOE/Yahoo（遅延あり）をプロキシ経由で取得。IV は提供値、ギリシャ指標は IV からブラック・ショールズ(r=4%,配当0)で算出した目安です。</div>
     </div>
 
     <div class="card">
@@ -603,7 +603,36 @@ async function fetchStooq(sym){
   if(text.trim().startsWith('<')||/N\/D/.test(text)) throw new Error('Stooqに該当データなし。銘柄表記を確認するか、CSV貼付をご利用ください。');
   return parseCSV(text);
 }
-/* ===== オプション（Yahoo Finance・プロキシ経由） ===== */
+/* ===== オプション：CBOE優先→Yahooフォールバック ===== */
+async function fetchOptions(sym, dateTs){
+  const errs=[];
+  try{ return await fetchCboeOptions(sym,dateTs); }catch(e){ errs.push('CBOE:'+(e.message||e)); }
+  try{ return await fetchYahooOptions(sym,dateTs); }catch(e){ errs.push('Yahoo:'+(e.message||e)); }
+  throw new Error(errs.join(' / '));
+}
+// CBOE 遅延クォート（OCCシンボルをパース）。CDNはCORS寛容で直接取得できることが多い。
+async function fetchCboeOptions(sym, dateTs){
+  const url=`https://cdn.cboe.com/api/global/delayed_quotes/options/${encodeURIComponent(sym)}.json`;
+  const txt=await fetchText(url);
+  let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error('解析失敗'); }
+  const d=j.data; if(!d||!d.options||!d.options.length) throw new Error('データなし');
+  const price=d.current_price||d.close||d.last_trade_price||0;
+  const byExp={};
+  for(const o of d.options){
+    const m=(o.option||'').match(/^([A-Z]+)(\d{6})([CP])(\d{8})$/); if(!m) continue;
+    const label='20'+m[2].slice(0,2)+'-'+m[2].slice(2,4)+'-'+m[2].slice(4,6);
+    const ts=Math.floor(Date.parse(label+'T00:00:00Z')/1000);
+    const strike=parseInt(m[4],10)/1000;
+    const rec={strike,last:o.last_trade_price||0,bid:o.bid||0,ask:o.ask||0,vol:o.volume||0,oi:o.open_interest||0,iv:o.iv||0,itm:(m[3]==='C'?strike<price:strike>price)};
+    (byExp[ts]=byExp[ts]||{ts,label,calls:[],puts:[]})[m[3]==='C'?'calls':'puts'].push(rec);
+  }
+  const tss=Object.keys(byExp).map(Number).sort((a,b)=>a-b);
+  if(!tss.length) throw new Error('限月解析不可');
+  const now=Date.now()/1000;
+  const chosen=(dateTs&&byExp[dateTs])?dateTs:(tss.find(t=>t>now)||tss[0]);
+  const ex=byExp[chosen]; ex.calls.sort((a,b)=>a.strike-b.strike); ex.puts.sort((a,b)=>a.strike-b.strike);
+  return {price, exps:tss.map(t=>({ts:t,label:byExp[t].label})), expiry:{ts:ex.ts,calls:ex.calls,puts:ex.puts}};
+}
 async function fetchYahooOptions(sym, dateTs){
   const base=`https://query1.finance.yahoo.com/v7/finance/options/${encodeURIComponent(sym)}`+(dateTs?`?date=${dateTs}`:'');
   const txt=await fetchText(base);
@@ -825,7 +854,7 @@ async function loadOptions(dateTs){
   const e=document.getElementById('opt-err'); e.style.display='none';
   const btn=document.getElementById('optload'); btn.textContent='取得中…'; btn.disabled=true;
   try{
-    const opt=await fetchYahooOptions(sym, dateTs);
+    const opt=await fetchOptions(sym, dateTs);
     optData=opt; optSym=sym;
     // 限月セレクト
     const sel=document.getElementById('opt-exp'); sel.innerHTML='';
