@@ -318,14 +318,35 @@ function judge(d){
 }
 
 /* ===== データ取得 ===== */
+// Stooq等はCORSヘッダを返さないため、直接取得→公開CORSプロキシの順にフォールバック。
+// （扱うのは公開株価データのみ。認証情報は一切送信しません）
+async function fetchText(url){
+  const attempts=[
+    url,
+    'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
+    'https://corsproxy.io/?url='+encodeURIComponent(url),
+    'https://thingproxy.freeboard.io/fetch/'+url
+  ];
+  let lastErr;
+  for(const u of attempts){
+    try{
+      const res=await fetch(u,{cache:'no-store'});
+      if(!res.ok){ lastErr=new Error('HTTP '+res.status); continue; }
+      const t=await res.text();
+      if(t && t.trim().length>20) return t;
+      lastErr=new Error('空応答');
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr||new Error('取得失敗');
+}
 async function fetchStooq(sym){
   // Stooq: 米国株は ".us" を付与
   const s = sym.includes('.')? sym.toLowerCase() : sym.toLowerCase()+'.us';
   const url=`https://stooq.com/q/d/l/?s=${encodeURIComponent(s)}&i=d`;
-  const res=await fetch(url);
-  if(!res.ok) throw new Error('Stooq取得失敗 (CORS/銘柄要確認): '+res.status);
-  const text=await res.text();
-  if(text.trim().startsWith('<')||/N\/D/.test(text)) throw new Error('Stooqからデータなし。銘柄表記を確認するかCSV貼付をご利用ください。');
+  let text;
+  try{ text=await fetchText(url); }
+  catch(e){ throw new Error('Stooq取得に失敗（ネットワーク/プロキシ制限）。「Twelve Data」か「CSV貼付」をお試しください。'); }
+  if(text.trim().startsWith('<')||/N\/D/.test(text)) throw new Error('Stooqに該当データなし。銘柄表記を確認するか、CSV貼付をご利用ください。');
   return parseCSV(text);
 }
 async function fetchTwelve(sym,key){
