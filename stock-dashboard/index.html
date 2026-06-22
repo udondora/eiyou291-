@@ -145,7 +145,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v9<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v10<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -274,7 +274,7 @@ a{color:var(--ac)}
     <div class="card">
       <h2>⑥ 主要指標</h2>
       <div class="mgrid">
-        <div class="metric"><div class="k">RS Rating(近似)</div><div class="v" id="m-rs">—</div></div>
+        <div class="metric"><div class="k">RS Rating(IBD式近似)</div><div class="v" id="m-rs">—</div></div>
         <div class="metric"><div class="k">% Gain From MA(21EMA)</div><div class="v" id="m-gain">—</div></div>
         <div class="metric"><div class="k">ATR% Multiple From MA</div><div class="v" id="m-atrmult">—</div></div>
         <div class="metric"><div class="k">ATR%(14)</div><div class="v" id="m-atr">—</div></div>
@@ -398,20 +398,21 @@ function bsGreeks(type,S,K,T,r,iv){
   return {delta,gamma,theta,vega};
 }
 
-/* RS Rating近似: SPY比の複数期間加重(IBD風) を 1-99 にマップ */
+/* RS Rating(IBD式近似): 直近四半期を2倍加重(0.4/0.2/0.2/0.2)した対SPY相対力を1-99へ。
+   ※本来のIBD Ratingは全市場のパーセンタイル。母集団を持てないため絶対マッピングで近似。 */
 function rsRatingApprox(closes, spyCloses){
   function rel(back){
     const s=pctChange(closes,back), b=pctChange(spyCloses,back);
     if(s==null||b==null) return null;
     return (1+s/100)/(1+b/100); // 1超で市場をアウトパフォーム
   }
-  const r63=rel(63), r126=rel(126), r189=rel(189), r252=rel(252);
-  const parts=[[r63,2],[r126,1],[r189,1],[r252,1]].filter(p=>p[0]!=null);
+  // IBD加重: 0.4*Q1 + 0.2*Q2 + 0.2*Q3 + 0.2*Q4
+  const parts=[[rel(63),0.4],[rel(126),0.2],[rel(189),0.2],[rel(252),0.2]].filter(p=>p[0]!=null);
   if(!parts.length) return null;
   let num=0,den=0; parts.forEach(([v,w])=>{num+=Math.log(v)*w;den+=w;});
-  const score=num/den; // 0中心(=SPY並)
-  // logisticで1-99へ（±15%/期間程度でほぼ振り切る）
-  const rating=Math.round(1+98/(1+Math.exp(-score*14)));
+  const comp=num/den; // 0=SPY並み、正で優位
+  // tanhで滑らかに1-99へ（係数3.0で過度な99張り付きを抑制）
+  const rating=Math.round(50+50*Math.tanh(comp*3.0));
   return Math.max(1,Math.min(99,rating));
 }
 
