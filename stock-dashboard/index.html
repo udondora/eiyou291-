@@ -106,6 +106,12 @@ a{color:var(--ac)}
 .act.tp{background:rgba(245,158,11,.16);color:var(--wait)}
 .act.wait{background:rgba(239,68,68,.16);color:var(--ng)}
 
+/* buy filters */
+.filters2{display:flex;flex-direction:column;gap:9px;margin-top:8px}
+.filters2 label{display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:700;color:var(--tx);cursor:pointer;line-height:1.4}
+.filters2 input{width:19px;height:19px;flex:0 0 19px;margin-top:1px;accent-color:var(--ac)}
+.filters2 .sub{color:var(--muted);font-weight:600;font-size:11.5px}
+
 /* recent symbol chips */
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .chip{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:900;cursor:pointer;min-height:34px}
@@ -179,7 +185,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v11<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v12<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -232,6 +238,19 @@ a{color:var(--ac)}
       ⚠️ 本ツールはトレンドテンプレートの機械的判定を可視化するものです。投資判断・売買の最終責任はご自身にあります（投資助言ではありません）。
     </div>
     <div id="err" class="err"></div>
+  </div>
+
+  <!-- 買い候補フィルター -->
+  <div class="card">
+    <h2>🔧 買い候補フィルター <span class="tiny muted">（OFFで無効化＝その条件で弾かない）</span></h2>
+    <div class="filters2">
+      <label><input type="checkbox" id="f-market" checked> 地合いフィルター<span class="sub">／SPYが上昇トレンド(50・200日線の上)の時だけ「買い候補」</span></label>
+      <label><input type="checkbox" id="f-pullback" checked> 健全な押し目のみ<span class="sub">／50日線の上＋反発確認（崩れている押し目は除外）</span></label>
+      <label><input type="checkbox" id="f-breakout" checked> ブレイクは52週高値圏のみ<span class="sub">／高値−8%以内のブレイクだけ買い候補</span></label>
+      <label><input type="checkbox" id="f-rs" checked> RS≥70 必須<span class="sub">／相対的に弱い銘柄は買い候補にしない</span></label>
+      <label><input type="checkbox" id="f-risk" checked> 損切り幅が大きい銘柄を除外<span class="sub">／現値→損切りが10%超は見送り</span></label>
+    </div>
+    <div class="tiny muted" style="margin-top:8px">変更すると、表示中の判定はすぐ再評価されます（スクリーニングは再実行で反映）。</div>
   </div>
 
   <!-- ウォッチリスト・スクリーニング -->
@@ -353,7 +372,20 @@ const CONFIG = {
   pullbackMax:6,          // 21EMAからの乖離がこの値以下なら「押し目買い」圏（出来高不問）
   volSurge:1.5,           // 出来高倍率がこの値超で「出来高あり」
   rsGood:70,              // RS Rating近似がこの値以上で良好
+  maxRiskPct:10,          // 損切り幅(現値→損切り)がこの%超なら買い候補から除外
 };
+// 買い候補フィルター（各ON/OFFで有効/無効。OFF=その条件で弾かない）
+const FILTERS = { market:true, pullback:true, breakout:true, rs:true, risk:true };
+function applyFilters(o){ Object.assign(FILTERS,o); }
+// 相場環境：SPYが上昇トレンド(50/200日線の上＆200日線上向き)か
+function marketRegime(spyCloses){
+  const n=spyCloses.length-1; if(n<60) return null;
+  const s50=sma(spyCloses,50)[n], s200=sma(spyCloses,200)[n], s200p=sma(spyCloses,200)[n-21];
+  if(s50==null) return null;
+  const above = spyCloses[n]>s50 && (s200==null||spyCloses[n]>s200);
+  const up200 = (s200==null||s200p==null)? true : s200>=s200p;
+  return above && up200;
+}
 // エントリー厳しさプリセット（買い候補をどこまで許容するか）
 const PRESETS = {
   loose:  {pullbackMax:12, gainFromMA_entryMax:20, volSurge:1.2, gainFromMA_hot:30, atrMult_hot:9},
@@ -498,6 +530,18 @@ function judge(d){
   const stacked = (ema9!=null&&ema21!=null) && close>ema9 && ema9>ema21;
   const aboveMA  = (sma50!=null? close>sma50 : true) && (sma200!=null? close>sma200 : true);
   const emaUp = (ema21prev!=null)? ema21>ema21prev : true;
+  const prevClose = d.close[n-1];
+
+  // --- 価格レベル（損切り・利確・R）※フィルターで使うので先に算出 ---
+  let swingLow=Infinity;
+  for(let i=Math.max(0,n-9);i<=n;i++) swingLow=Math.min(swingLow,d.low[i]);
+  const stopATR= atrv!=null? close-2*atrv : null;
+  let stop = stopATR!=null? Math.max(swingLow, stopATR) : swingLow; // 下方の論理的支持の高い方
+  if(!(stop<close)) stop = stopATR!=null? stopATR : close*0.95;     // 現値以上なら無効→ATR/5%
+  const riskPerShare = close-stop;
+  const riskPct = riskPerShare/close*100;
+  const levels={ swingLow, stop, stopATR, riskPerShare, riskPct,
+    target2R: close+2*riskPerShare, target3R: close+3*riskPerShare };
 
   const rs = d.rs; // 事前計算
   const reasons=[];
@@ -526,7 +570,26 @@ function judge(d){
     if(nearMA){ entry='OK'; entryKind='押し目'; }
     else if(withinBreak && volOK){ entry='OK'; entryKind='ブレイク'; }
   }
-  reasons.push(`押し目圏(≤${CONFIG.pullbackMax}%): ${nearMA?'○':'×'} / 出来高倍率 ${volX!=null?volX.toFixed(2)+'x':'—'}（閾値${CONFIG.volSurge}x）`);
+
+  // --- 買い候補フィルター（各ON/OFFで絞り込み） ---
+  const F=FILTERS, blocks=[];
+  // 健全な押し目：50日線の上＋（反発確認: 前日比プラス or 9EMA上）＋崩れていない
+  const pullbackHealthy = (sma50==null||close>sma50)
+    && ((prevClose==null)||(close>=prevClose)||(ema9!=null&&close>ema9))
+    && (gainFromMA==null||gainFromMA>-3);
+  const nearHigh = from52high>=-8;   // 52週高値圏(−8%以内)
+  let marketBlocked=false;
+  if(entry==='OK'){
+    if(F.market && d.marketOK===false){ blocks.push('地合い(SPY弱い)'); marketBlocked=true; }
+    if(F.pullback && entryKind==='押し目' && !pullbackHealthy) blocks.push('押し目が未確認(MA割れ/反発なし)');
+    if(F.breakout && entryKind==='ブレイク' && !nearHigh) blocks.push('52週高値圏でない');
+    if(F.rs && rs!=null && rs<70) blocks.push('RS<70');
+    if(F.risk && isFinite(riskPct) && riskPct>CONFIG.maxRiskPct) blocks.push(`損切り幅大(${riskPct.toFixed(0)}%)`);
+    if(blocks.length) entry='待機'; // フィルターで弾かれたら見送り
+  }
+  reasons.push(`押し目圏(≤${CONFIG.pullbackMax}%): ${nearMA?'○':'×'} / 出来高 ${volX!=null?volX.toFixed(2)+'x':'—'}（閾値${CONFIG.volSurge}x）`);
+  if(F.market) reasons.push(`地合い(SPY上昇): ${d.marketOK==null?'不明':(d.marketOK?'○':'×')}`);
+  if(blocks.length) reasons.push('買い候補ブロック: '+blocks.join(' / '));
 
   // --- 利確 ---
   let tp='待機';
@@ -537,6 +600,7 @@ function judge(d){
   if(trend!=='OK') action='様子見';
   else if(tp==='OK') action='利確検討';
   else if(entry==='OK') action= entryKind==='押し目'?'買い候補(押し目)':'買い候補';
+  else if(marketBlocked) action='様子見';        // 地合い弱は様子見
   else action='保有/待機';
 
   // --- トレンドテンプレート8条件（Minervini）---
@@ -566,23 +630,12 @@ function judge(d){
 
   // --- アドバイス文（自然文）---
   const advice=buildAdvice({action,trend,entry,tp,hot,gainFromMA,volX,rsi14,
-    ttPass,ttEval,tt,from52high,stacked,emaUp});
-
-  // --- 価格レベル（損切り・利確・R）---
-  let swingLow=Infinity;
-  for(let i=Math.max(0,n-9);i<=n;i++) swingLow=Math.min(swingLow,d.low[i]);
-  const stopATR= atrv!=null? close-2*atrv : null;
-  let stop = stopATR!=null? Math.max(swingLow, stopATR) : swingLow; // 下方の論理的支持の高い方
-  if(!(stop<close)) stop = stopATR!=null? stopATR : close*0.95;     // 現値以上なら無効→ATR/5%
-  const riskPerShare = close-stop;
-  const riskPct = riskPerShare/close*100;
-  const levels={ swingLow, stop, stopATR, riskPerShare, riskPct,
-    target2R: close+2*riskPerShare, target3R: close+3*riskPerShare };
+    ttPass,ttEval,tt,from52high,stacked,emaUp,blocks});
 
   return {
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
-    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels
+    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK
   };
 }
 
@@ -598,17 +651,27 @@ function buildAdvice(x){
     body.push('<span class="risk">リスク管理</span>：直近安値や21EMA割れを損切りラインの目安に。');
   } else if(x.action==='保有/待機'){
     head='保有／新規は待機'; ico='✋'; cls='wait';
-    body.push('トレンドは良好だが、'+(x.gainFromMA!=null&&x.gainFromMA>CONFIG.gainFromMA_entryMax?'21EMAから伸びており新規は不利':'出来高など条件が未充足')+'。');
+    if(x.blocks&&x.blocks.length){
+      body.push('セットアップは出たが<b>フィルターで除外</b>：'+x.blocks.join(' / ')+'。');
+    } else {
+      body.push('トレンドは良好だが、'+(x.gainFromMA!=null&&x.gainFromMA>CONFIG.gainFromMA_entryMax?'21EMAから伸びており新規は不利':'出来高など条件が未充足')+'。');
+    }
     body.push('<b>押し目（9EMA/21EMA付近への調整）</b>を待つのが定石。保有中なら継続。');
   } else if(x.action==='利確検討'){
     head='過熱：利確を検討'; ico='🔥'; cls='wait';
     body.push('移動平均から大きく乖離し過熱（'+(x.gainFromMA!=null?'+'+x.gainFromMA.toFixed(0)+'%乖離':'')+'）。');
     body.push('<b>一部利確やトレーリングストップ</b>でリスクを圧縮する局面。新規追随は不利。');
   } else {
-    head='様子見：トレンド未成立'; ico='⏸️'; cls='ng';
-    body.push('上昇トレンドの条件が揃っていません。新規エントリーは見送りが無難。');
-    if(fails.length) body.push('未達の主な条件：<b>'+fails.slice(0,3).join(' / ')+'</b>');
-    body.push('価格が9EMA>21EMAで並び、主要MAを回復するまで待機を推奨。');
+    if(x.blocks&&x.blocks.indexOf('地合い(SPY弱い)')>=0){
+      head='様子見：地合いが弱い'; ico='🌧️'; cls='ng';
+      body.push('銘柄は強いが<b>相場全体(SPY)が下降トレンド</b>。Minerviniの鉄則「地合いに逆らわない」に従い見送り。');
+      body.push('地合いフィルターをOFFにすれば、地合いを無視して判定もできます。');
+    } else {
+      head='様子見：トレンド未成立'; ico='⏸️'; cls='ng';
+      body.push('上昇トレンドの条件が揃っていません。新規エントリーは見送りが無難。');
+      if(fails.length) body.push('未達の主な条件：<b>'+fails.slice(0,3).join(' / ')+'</b>');
+      body.push('価格が9EMA>21EMAで並び、主要MAを回復するまで待機を推奨。');
+    }
   }
   if(x.rsi14!=null){
     if(x.rsi14>=80) body.push('RSI '+x.rsi14.toFixed(0)+'：短期は買われ過ぎ圏。');
@@ -961,6 +1024,7 @@ async function fetchSeries(sym, source, onWait){
 }
 // SPYベンチマークを10分キャッシュ（RS計算用・API節約）
 let _spyCache={data:null,ts:0,source:''};
+let lastData=null, lastSym=null;   // 直近判定データ（フィルター変更時の再評価用）
 async function getBenchmark(source){
   if(source==='csv') return null;
   if(_spyCache.data && _spyCache.source===source && Date.now()-_spyCache.ts<6e5) return _spyCache.data;
@@ -980,17 +1044,19 @@ async function run(){
     if(source==='csv') d=parseCSV(document.getElementById('csv').value);
     else d=await fetchSeries(sym,source);
 
-    // SPY（ベンチマーク）で RS を計算。失敗してもRSなしで継続。
-    d.rs=null; d.rsSpy1=null; d.rsSpy3=null;
+    // SPY（ベンチマーク）で RS と地合いを計算。失敗してもなしで継続。
+    d.rs=null; d.rsSpy1=null; d.rsSpy3=null; d.marketOK=null;
     try{
       const spy=await getBenchmark(source);
       if(spy){
         d.rs=rsRatingApprox(d.close, spy.close);
         d.rsSpy1=(pctChange(d.close,21)??0)-(pctChange(spy.close,21)??0);
         d.rsSpy3=(pctChange(d.close,63)??0)-(pctChange(spy.close,63)??0);
+        d.marketOK=marketRegime(spy.close);
       }
-    }catch(e){ /* RSなしで継続 */ }
+    }catch(e){ /* なしで継続 */ }
 
+    lastData=d; lastSym=sym;
     const r=judge(d);
     render(sym,d,r);
     renderChart(sym,exch);
@@ -1027,12 +1093,21 @@ function runDemo(){
   d.rs=rsRatingApprox(d.close,spy.close);
   d.rsSpy1=(pctChange(d.close,21)??0)-(pctChange(spy.close,21)??0);
   d.rsSpy3=(pctChange(d.close,63)??0)-(pctChange(spy.close,63)??0);
+  d.marketOK=marketRegime(spy.close);
+  lastData=d; lastSym='DEMO';
   const r=judge(d);
   render('DEMO',d,r);
   document.getElementById('symlabel').textContent='DEMO（サンプルデータ）';
   renderChart(document.getElementById('symbol').value.trim().toUpperCase()||'NBIS',
               document.getElementById('exchange').value.trim().toUpperCase());
   document.getElementById('result').scrollIntoView({behavior:'smooth'});
+}
+// フィルター/プリセット変更時、再取得せず直近データで判定し直す
+function reJudge(){
+  if(!lastData) return;
+  const r=judge(lastData);
+  render(lastSym==='DEMO'?'DEMO':(lastSym||''), lastData, r);
+  if(lastSym==='DEMO') document.getElementById('symlabel').textContent='DEMO（サンプルデータ）';
 }
 
 /* 最近使った銘柄（最大8件、このブラウザに保存） */
@@ -1075,6 +1150,7 @@ async function screen(){
     }
     if(d){
       d.rs= spy? rsRatingApprox(d.close,spy.close):null;
+      d.marketOK= spy? marketRegime(spy.close):null;
       const r=judge(d);
       scrnRows.push({sym,ok:true,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
     }
@@ -1124,7 +1200,11 @@ document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='En
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('screen').addEventListener('click',screen);
-document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); });
+document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); });
+// 買い候補フィルターのチェックボックス
+const FILTER_IDS={market:'f-market',pullback:'f-pullback',breakout:'f-breakout',rs:'f-rs',risk:'f-risk'};
+function readFilters(){ const o={}; for(const k in FILTER_IDS) o[k]=document.getElementById(FILTER_IDS[k]).checked; applyFilters(o); localStorage.setItem('filters',JSON.stringify(o)); }
+Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListener('change',()=>{ readFilters(); reJudge(); }));
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
   const k=th.dataset.k;
   if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
@@ -1150,6 +1230,9 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   const wl=localStorage.getItem('wl'); if(wl) document.getElementById('wl').value=wl;
   const pre=localStorage.getItem('preset')||'normal';
   document.getElementById('preset').value=pre; applyPreset(pre);
+  // フィルター状態を復元
+  try{ const sf=JSON.parse(localStorage.getItem('filters')||'null'); if(sf){ for(const k in FILTER_IDS){ if(typeof sf[k]==='boolean') document.getElementById(FILTER_IDS[k]).checked=sf[k]; } } }catch(e){}
+  readFilters();
   renderRecent();
 })();
 </script>
