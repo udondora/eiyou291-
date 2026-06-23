@@ -185,7 +185,7 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v12<br><span id="build" style="font-weight:700"></span></div>
+  <div class="hs" style="text-align:right">v13<br><span id="build" style="font-weight:700"></span></div>
 </div>
 
 <div class="wrap">
@@ -250,7 +250,7 @@ a{color:var(--ac)}
       <label><input type="checkbox" id="f-rs" checked> RS≥70 必須<span class="sub">／相対的に弱い銘柄は買い候補にしない</span></label>
       <label><input type="checkbox" id="f-risk" checked> 損切り幅が大きい銘柄を除外<span class="sub">／現値→損切りが10%超は見送り</span></label>
     </div>
-    <div class="tiny muted" style="margin-top:8px">変更すると、表示中の判定はすぐ再評価されます（スクリーニングは再実行で反映）。</div>
+    <div class="tiny muted" style="margin-top:8px">変更すると、表示中の判定とスクリーニング表の両方がすぐ再評価されます（再取得なし）。</div>
   </div>
 
   <!-- ウォッチリスト・スクリーニング -->
@@ -1152,7 +1152,7 @@ async function screen(){
       d.rs= spy? rsRatingApprox(d.close,spy.close):null;
       d.marketOK= spy? marketRegime(spy.close):null;
       const r=judge(d);
-      scrnRows.push({sym,ok:true,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
+      scrnRows.push({sym,ok:true,d,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
     }
     renderScreen();
     if(i<syms.length-1) await sleep(source==='twelvedata'?150:400);
@@ -1188,6 +1188,13 @@ function renderScreen(){
     e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run();
   }));
 }
+// フィルター/プリセット変更時、取得済みデータで表を再評価（再取得なし）
+function reScreen(){
+  if(!scrnRows.length) return;
+  scrnRows.forEach(row=>{ if(row.ok && row.d){ const r=judge(row.d);
+    row.action=r.action; row.ttPass=r.ttPass; row.ttEval=r.ttEval; row.rs=r.rs; row.gain=r.gainFromMA; } });
+  renderScreen();
+}
 
 /* UI wiring */
 document.getElementById('source').addEventListener('change',e=>{
@@ -1200,11 +1207,11 @@ document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='En
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('screen').addEventListener('click',screen);
-document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); });
+document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); reScreen(); });
 // 買い候補フィルターのチェックボックス
 const FILTER_IDS={market:'f-market',pullback:'f-pullback',breakout:'f-breakout',rs:'f-rs',risk:'f-risk'};
 function readFilters(){ const o={}; for(const k in FILTER_IDS) o[k]=document.getElementById(FILTER_IDS[k]).checked; applyFilters(o); localStorage.setItem('filters',JSON.stringify(o)); }
-Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListener('change',()=>{ readFilters(); reJudge(); }));
+Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListener('change',()=>{ readFilters(); reJudge(); reScreen(); }));
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
   const k=th.dataset.k;
   if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
