@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v19<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v20<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -402,10 +402,12 @@ a{color:var(--ac)}
         <div class="field"><label class="lbl">取得単価(任意)</label><input id="entrypx" class="t" style="width:110px" inputmode="decimal" placeholder="例 250.5"/></div>
         <div class="field"><label class="lbl">含み損益</label><div class="metric" style="padding:9px 12px;min-width:130px"><div class="v" id="pl" style="font-size:16px">—</div></div></div>
       </div>
-      <table class="jt" style="margin-top:10px">
-        <tr><td class="k">21EMA（短期支持）</td><td class="v" id="w-ema21">—</td><td class="k">50日線（中期支持）</td><td class="v" id="w-sma50">—</td></tr>
-        <tr><td class="k">直近スイング安値</td><td class="v" id="w-swing">—</td><td class="k">提案損切り</td><td class="v" id="w-stop">—</td></tr>
-      </table>
+      <div class="lv" style="margin-top:10px">
+        <div class="lvbox"><div class="k">21EMA（短期支持）</div><div class="v" id="w-ema21">—</div></div>
+        <div class="lvbox"><div class="k">50日線（中期支持）</div><div class="v" id="w-sma50">—</div></div>
+        <div class="lvbox"><div class="k">直近スイング安値</div><div class="v" id="w-swing">—</div></div>
+        <div class="lvbox stop"><div class="k">提案損切り</div><div class="v" id="w-stop">—</div></div>
+      </div>
       <div class="tiny muted" style="margin-top:6px">支持線（21EMA→50日線→スイング安値）を割るほど警戒度UP。取得単価を入れると含み損益と損切りライン到達を判定します。</div>
     </div>
 
@@ -658,7 +660,9 @@ function judge(d){
     if(hH>lL){ half=(close-lL)/(hH-lL)*100; } // 安値からの戻り%
   }
 
-  const stacked = (ema9!=null&&ema21!=null) && close>ema9 && ema9>ema21;
+  // 上昇配列: 価格が21EMAの上＋9EMA>21EMA（価格は9EMAを一時割っても=押し目はトレンド維持とみなす）
+  const stacked = (ema9!=null&&ema21!=null) && close>ema21 && ema9>ema21;
+  const aboveEma9 = ema9!=null && close>ema9;
   const aboveMA  = (sma50!=null? close>sma50 : true) && (sma200!=null? close>sma200 : true);
   const emaUp = (ema21prev!=null)? ema21>ema21prev : true;
   const prevClose = d.close[n-1];
@@ -677,10 +681,10 @@ function judge(d){
   const rs = d.rs; // 事前計算
   const reasons=[];
 
-  // --- Trend ---  上昇トレンド = 段階(価格>9EMA>21EMA) ＋ 主要MA上 ＋ 21EMA上向き
-  // （RSは買い候補フィルター側で評価。trendは純粋な価格構造で判定）
+  // --- Trend ---  上昇トレンド = 上昇配列(価格>21EMA & 9>21) ＋ 主要MA上 ＋ 21EMA上向き
+  // （9EMAの一時割れ=押し目はトレンド維持。RSは買い候補フィルターで評価）
   let trend = (stacked && aboveMA && emaUp) ? 'OK' : 'NG';
-  reasons.push(`段階(価格>9EMA>21EMA): ${stacked?'○':'×'}`);
+  reasons.push(`上昇配列(価格>21EMA & 9EMA>21EMA): ${stacked?'○':'×'}${aboveEma9?'':'（9EMAは一時割れ=押し目）'}`);
   reasons.push(`主要MA上 & 21EMA上向き: ${aboveMA?'○':'×'} / ${emaUp?'○':'×'}`);
   if(rs!=null) reasons.push(`RS Rating近似: ${rs}（${rs>=CONFIG.rsGood?'良好':'弱い'}）`);
 
