@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v18<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v19<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -392,6 +392,21 @@ a{color:var(--ac)}
         <tr><td class="k">出来高</td><td class="v" id="t-vol"></td><td class="k">出来高倍率</td><td class="v" id="t-volx"></td></tr>
         <tr><td class="k">半値返し</td><td class="v" id="t-half"></td><td class="k">過熱</td><td class="v" id="t-hot"></td></tr>
       </table>
+    </div>
+
+    <div class="card">
+      <h2>🚪 売却・保有判断 <span class="tag">保有中の人向け</span></h2>
+      <div class="headline" id="sell-headline"><span class="ico" id="sell-ico">—</span><span class="txt" id="sell-txt">—</span></div>
+      <div class="advice" id="sell-reasons"></div>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label class="lbl">取得単価(任意)</label><input id="entrypx" class="t" style="width:110px" inputmode="decimal" placeholder="例 250.5"/></div>
+        <div class="field"><label class="lbl">含み損益</label><div class="metric" style="padding:9px 12px;min-width:130px"><div class="v" id="pl" style="font-size:16px">—</div></div></div>
+      </div>
+      <table class="jt" style="margin-top:10px">
+        <tr><td class="k">21EMA（短期支持）</td><td class="v" id="w-ema21">—</td><td class="k">50日線（中期支持）</td><td class="v" id="w-sma50">—</td></tr>
+        <tr><td class="k">直近スイング安値</td><td class="v" id="w-swing">—</td><td class="k">提案損切り</td><td class="v" id="w-stop">—</td></tr>
+      </table>
+      <div class="tiny muted" style="margin-top:6px">支持線（21EMA→50日線→スイング安値）を割るほど警戒度UP。取得単価を入れると含み損益と損切りライン到達を判定します。</div>
     </div>
 
     <div class="card">
@@ -720,6 +735,37 @@ function judge(d){
   else if(marketBlocked) action='様子見';        // 地合い弱は様子見
   else action='保有/待機';
 
+  // --- 売却・保有判断（保有者向け） ---
+  let sellSwing=Infinity;                          // 直近10日の安値（当日除く）
+  for(let i=Math.max(0,n-10);i<n;i++) sellSwing=Math.min(sellSwing,d.low[i]);
+  const belowEma21 = ema21!=null && close<ema21;
+  const belowSma50 = sma50!=null && close<sma50;
+  const belowSwing = isFinite(sellSwing) && close<sellSwing;
+  const climax = (gainFromMA!=null&&gainFromMA>CONFIG.gainFromMA_hot) || (rsi14!=null&&rsi14>=85) || hot;
+  const distribution = (prevClose!=null && close<prevClose*0.98) && (volX!=null&&volX>CONFIG.volSurge); // 出来高伴う2%超下落
+  const sellReasons=[];
+  let sellAction;
+  if(trend!=='OK' || belowSma50 || belowSwing){
+    sellAction='売り（手仕舞い）';
+    if(trend!=='OK') sellReasons.push('トレンド崩れ');
+    if(belowSma50) sellReasons.push('50日線割れ');
+    if(belowSwing) sellReasons.push('直近スイング安値割れ');
+  } else if(belowEma21 || distribution){
+    sellAction='警戒（縮小）';
+    if(belowEma21) sellReasons.push('21EMA割れ（短期トレンド悪化）');
+    if(distribution) sellReasons.push('出来高を伴う下落（分配の兆候）');
+  } else if(climax){
+    sellAction='一部利確';
+    if(gainFromMA!=null&&gainFromMA>CONFIG.gainFromMA_hot) sellReasons.push(`MAから過大乖離(+${gainFromMA.toFixed(0)}%)`);
+    if(rsi14!=null&&rsi14>=85) sellReasons.push(`RSI過熱(${rsi14.toFixed(0)})`);
+  } else {
+    sellAction='継続保有';
+    sellReasons.push('トレンド健全・過熱なし。9EMA/21EMA上向きを維持する限り保有継続');
+  }
+  const sell={action:sellAction, reasons:sellReasons,
+    watch:{ema21,sma50,sellSwing:isFinite(sellSwing)?sellSwing:null},
+    belowEma21,belowSma50,belowSwing,climax,distribution};
+
   // --- トレンドテンプレート8条件（Minervini）---
   const tt=[
     {id:1, desc:'価格が150日線・200日線より上',
@@ -763,7 +809,7 @@ function judge(d){
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
     trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK,
-    score,nearBreakout,weeklyUp,avgDollarVol
+    score,nearBreakout,weeklyUp,avgDollarVol,sell
   };
 }
 
@@ -968,6 +1014,31 @@ function bar(lab,numHtml,pctFill,cls){
   return `<div class="barrow"><div class="head"><span class="lab">${lab}</span><span class="num">${numHtml}</span></div>`
     +`<div class="bar"><div class="barfill ${cls||''}" style="width:${Math.max(0,Math.min(100,pctFill))}%"></div></div></div>`;
 }
+let lastSell=null;
+function renderSell(r){
+  const s=r.sell; lastSell={close:r.close, stop:r.levels.stop};
+  const map={'継続保有':['ok','✅'],'一部利確':['wait','💰'],'警戒（縮小）':['wait','⚠️'],'売り（手仕舞い）':['ng','🔻']};
+  const [cls,ico]=map[s.action]||['wait','—'];
+  const hl=document.getElementById('sell-headline'); hl.className='headline '+cls;
+  document.getElementById('sell-ico').textContent=ico;
+  document.getElementById('sell-txt').textContent=s.action;
+  document.getElementById('sell-reasons').innerHTML='・'+s.reasons.join('<br>・');
+  const pill=(v,below)=> v==null?'—':`${fmt(v)} <span class="pill ${below?'ng':'ok'}">${below?'割れ':'上'}</span>`;
+  document.getElementById('w-ema21').innerHTML=pill(s.watch.ema21, s.belowEma21);
+  document.getElementById('w-sma50').innerHTML=pill(s.watch.sma50, s.belowSma50);
+  document.getElementById('w-swing').innerHTML=pill(s.watch.sellSwing, s.belowSwing);
+  document.getElementById('w-stop').textContent=fmt(r.levels.stop);
+  updatePL();
+}
+function updatePL(){
+  const out=document.getElementById('pl'); if(!lastSell){ out.textContent='—'; return; }
+  const e=parseFloat((document.getElementById('entrypx').value||'').replace(/[, ]/g,''));
+  if(!e||e<=0){ out.innerHTML='<span class="muted" style="font-size:13px">単価を入力</span>'; return; }
+  const pl=(lastSell.close/e-1)*100;
+  const hitStop = lastSell.close<=lastSell.stop;
+  out.innerHTML=`<span class="${pl>=0?'pos':'neg'}">${pl>=0?'+':''}${pl.toFixed(1)}%</span>`
+    + (hitStop?' <span class="pill ng">損切りライン到達</span>':'');
+}
 function render(sym,d,r){
   document.getElementById('result').style.display='block';
   document.getElementById('symlabel').textContent=sym;
@@ -981,6 +1052,8 @@ function render(sym,d,r){
   const sc=r.score!=null?r.score:0;
   document.getElementById('score-num').textContent=sc;
   document.getElementById('score-fill').style.width=sc+'%';
+
+  renderSell(r);
 
   setVerdict('vc-trend',r.trend);
   setVerdict('vc-entry',r.entry);
@@ -1506,6 +1579,7 @@ document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
+document.getElementById('entrypx').addEventListener('input',updatePL);
 document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('bt-run').addEventListener('click',backtest);
