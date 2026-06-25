@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v24<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v25<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -339,9 +339,20 @@ a{color:var(--ac)}
         <label><input type="checkbox" id="bt-oos"> アウト・オブ・サンプル分割<span class="sub">／前半(IS)で見た傾向が後半(OOS=未知データ)でも保つか比較（カーブフィッティング対策）</span></label>
       </div>
       <div class="row" style="margin-top:10px">
+        <div class="field"><label class="lbl">最低スコア（エントリー条件）</label><input id="bt-minscore" class="t" style="width:90px" value="0" inputmode="numeric"/></div>
+      </div>
+      <div class="row" style="margin-top:10px">
         <button id="bt-run" class="btn">バックテスト実行</button>
         <button id="bt-wl" class="btn alt">🗂 ウォッチリスト全体</button>
         <span class="tiny muted" id="bt-status"></span>
+      </div>
+      <div style="margin-top:12px;border-top:1px solid var(--soft);padding-top:10px">
+        <div class="tiny muted">🎚 <b>重み自動最適化</b>：最低スコア以上の買い候補だけ建て、RS/条件/セットアップの配分を総当たりして<b>OOS期待値が最大の配分</b>を探します（過剰最適化を避けるためOOSで評価）。</div>
+        <div class="row" style="margin-top:8px">
+          <button id="bt-opt" class="btn alt">🎚 重み最適化</button>
+          <span class="tiny muted" id="opt-status"></span>
+        </div>
+        <div id="opt-body" style="display:none;margin-top:10px"></div>
       </div>
       <div id="bt-body" style="display:none;margin-top:12px">
         <div class="tiny muted" style="margin-bottom:8px">対象: <b id="bt-label" style="color:var(--ac)"></b></div>
@@ -1519,7 +1530,7 @@ function simulate(d, spyCloses, opts, iFrom, iTo){
     ds.marketOK= spyCloses? marketRegime(spyCloses.slice(0,len)) : null;
     const r=judge(ds);
     if(!pos){
-      if(r.action.indexOf('買い候補')===0){
+      if(r.action.indexOf('買い候補')===0 && r.score>=(opts.minScore||0)){
         const entry=(d.open[i+1]!=null&&d.open[i+1]>0)?d.open[i+1]:d.close[i];
         let stop= opts.stopMode==='pct'? entry*(1-opts.stopPct/100) : r.levels.stop;
         if(!(stop<entry)) stop=entry*(1-(opts.stopPct||8)/100);
@@ -1546,6 +1557,55 @@ function btStats(trades){
   return {N,winRate:N?wins.length/N*100:0,avgWin:wins.length?gW/wins.length:0,avgLoss:losses.length?-gL/losses.length:0,
     pf:gL?gW/gL:(gW>0?99:0),expR:N?sum(Rs)/N:0,totalRet:eq-100,maxDD,avgDays:N?sum(trades.map(t=>t.days))/N:0,trades};
 }
+// ===== 重み最適化用：重みに依存しない判定を1回だけ事前計算 =====
+function precomputeBars(d, spyCloses, opts){
+  const n=d.close.length, warm=Math.min(253, n-5);
+  const recs=new Array(n).fill(null);
+  for(let i=warm;i<n-1;i++){
+    const len=i+1;
+    const ds={time:d.time.slice(0,len),open:d.open.slice(0,len),high:d.high.slice(0,len),low:d.low.slice(0,len),close:d.close.slice(0,len),volume:d.volume.slice(0,len)};
+    ds.rs= spyCloses? rsRatingApprox(ds.close, spyCloses.slice(0,len)) : null;
+    ds.marketOK= spyCloses? marketRegime(spyCloses.slice(0,len)) : null;
+    const r=judge(ds), sp=r.scoreParts;
+    recs[i]={ isBuy:r.action.indexOf('買い候補')===0, trendOK:r.trend==='OK',
+      rsRaw:sp.rs.val, ttRaw:sp.tt.val, setupRaw:sp.setup.val,
+      marketOK:ds.marketOK, nearBO:!!r.nearBreakout, stopRef:r.levels.stop };
+  }
+  return {recs, warm, n};
+}
+function scoreFromRaw(rec, W){
+  const wsum=(W.rs+W.tt+W.setup)||1;
+  let s=Math.round((W.rs*rec.rsRaw + W.tt*rec.ttRaw + W.setup*rec.setupRaw)/wsum);
+  if(rec.marketOK===false) s=Math.round(s*0.85);
+  if(rec.nearBO) s=Math.min(100,s+3);
+  return Math.max(0,Math.min(100,s));
+}
+// 事前計算済みrecsから軽量シミュレーション（重み・最低スコアだけ可変）
+function simFromRecs(d, pre, W, minScore, opts, iFrom, iTo){
+  const {recs,warm,n}=pre;
+  const lo=Math.max(warm, iFrom==null?warm:iFrom), hi=Math.min(n-1, iTo==null?n-1:iTo);
+  let pos=null; const trades=[];
+  for(let i=lo;i<hi;i++){
+    const rec=recs[i]; if(!rec) continue;
+    if(!pos){
+      if(rec.isBuy && scoreFromRaw(rec,W)>=minScore){
+        const entry=(d.open[i+1]!=null&&d.open[i+1]>0)?d.open[i+1]:d.close[i];
+        let stop= opts.stopMode==='pct'? entry*(1-opts.stopPct/100) : rec.stopRef;
+        if(!(stop<entry)) stop=entry*(1-(opts.stopPct||8)/100);
+        pos={ei:i+1,entry,stop,risk:entry-stop};
+      }
+    } else {
+      const l=d.low[i],h=d.high[i],cl=d.close[i],op=d.open[i];
+      let exit=null;
+      if(l<=pos.stop) exit=(op<pos.stop)?op:pos.stop;
+      else if(opts.tp && h>=pos.entry+opts.tpR*pos.risk) exit=pos.entry+opts.tpR*pos.risk;
+      else if(opts.trendExit && !rec.trendOK) exit=cl;
+      if(exit!=null){ const ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({entry:pos.entry,stop:pos.stop,ret,days:i-pos.ei}); pos=null; }
+    }
+  }
+  if(pos){ const exit=d.close[hi], ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({entry:pos.entry,stop:pos.stop,ret,days:hi-pos.ei}); }
+  return trades;
+}
 function runBacktest(d, spyCloses, opts){
   const n=d.close.length, warm=Math.min(253, n-5);
   if(n < warm+20) return {error:'履歴が不足（長期データが必要。Twelve Data/Stooq推奨）'};
@@ -1562,8 +1622,67 @@ function btOpts(){
     tp: document.getElementById('bt-tp').checked,
     tpR: parseFloat(document.getElementById('bt-tpr').value)||2,
     trendExit: document.getElementById('bt-trendexit').checked,
-    cost: parseFloat(document.getElementById('bt-cost').value)||0
+    cost: parseFloat(document.getElementById('bt-cost').value)||0,
+    minScore: parseFloat(document.getElementById('bt-minscore').value)||0
   };
+}
+// ===== 重み自動最適化（最低スコアでエントリーを絞り、OOS期待値が最大の配分を探す） =====
+const OPT_COMBOS=(()=>{const a=[];for(const rs of [20,30,40,50])for(const tt of [20,30,40])for(const su of [20,30,40,50])a.push({rs,tt,setup:su});return a;})();
+async function optimizeWeights(){
+  const source=document.getElementById('source').value;
+  const st=document.getElementById('opt-status'); const btn=document.getElementById('bt-opt');
+  if(source==='csv'){ st.textContent='CSVは最適化非対応'; return; }
+  let syms=[...new Set((document.getElementById('wl').value||'').split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))].slice(0,12);
+  if(!syms.length){ const s=document.getElementById('symbol').value.trim().toUpperCase(); if(s) syms=[s]; }
+  if(!syms.length){ st.textContent='ウォッチリストか銘柄を入力'; return; }
+  btn.disabled=true; btn.textContent='最適化中…';
+  const opts=btOpts();
+  try{
+    let spy=null; try{ st.textContent='ベンチマーク取得中…'; const s=await fetchSeries(benchSym(),source,null,true); spy=s.close; }catch(e){}
+    const pres=[];
+    for(let i=0;i<syms.length;i++){ st.textContent=`事前計算 ${i+1}/${syms.length}: ${syms[i]}（重い処理・少々お待ちを）`;
+      try{ const d=await fetchSeries(syms[i],source,sec=>st.textContent=`レート制限待機 ${sec}s…`,true);
+        await new Promise(r=>setTimeout(r,0)); const pre=precomputeBars(d,spy,opts); pres.push({d,pre}); }catch(e){}
+      if(i<syms.length-1) await sleep(source==='twelvedata'?200:250);
+    }
+    if(!pres.length){ st.textContent='データ取得失敗'; return; }
+    st.textContent='重み総当たり中…';
+    const results=OPT_COMBOS.map(W=>{
+      const isT=[], oosT=[];
+      for(const {d,pre} of pres){ const mid=Math.floor((pre.warm+(pre.n-1))/2);
+        isT.push(...simFromRecs(d,pre,W,opts.minScore,opts,pre.warm,mid));
+        oosT.push(...simFromRecs(d,pre,W,opts.minScore,opts,mid,pre.n-1)); }
+      return {W, is:btStats(isT), oos:btStats(oosT)};
+    });
+    // OOS取引が十分なものを期待値順に
+    const ok=results.filter(r=>r.oos.N>=10);
+    (ok.length?ok:results).sort((a,b)=> b.oos.expR-a.oos.expR);
+    renderOpt((ok.length?ok:results).slice(0,6), opts.minScore, pres.length);
+    st.textContent=`完了：${pres.length}銘柄 / ${OPT_COMBOS.length}通り検証（最低スコア${opts.minScore}）`;
+  }catch(e){ st.textContent='失敗：'+(e.message||e); }
+  finally{ btn.disabled=false; btn.textContent='🎚 重み最適化'; }
+}
+function renderOpt(rows, minScore, nSym){
+  const box=document.getElementById('opt-body'); box.style.display='block';
+  const pc=(W,k)=>Math.round(W[k]/(W.rs+W.tt+W.setup)*100);
+  let h='<div class="tiny muted" style="margin-bottom:6px">OOS（未知データ）期待値が高い順。IS と OOS が両方プラスで近い配分が"頑健"。行をタップで適用。</div>';
+  h+='<div class="scrwrap"><table class="scrn"><thead><tr><th>配分 RS/条件/setup</th><th>OOS取引</th><th>OOS期待値</th><th>OOS-PF</th><th>IS期待値</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const W=r.W; const lab=`${pc(W,'rs')}/${pc(W,'tt')}/${pc(W,'setup')}`;
+    h+=`<tr class="optrow" data-rs="${pc(W,'rs')}" data-tt="${pc(W,'tt')}" data-setup="${pc(W,'setup')}" style="cursor:pointer">`+
+      `<td class="sym">${lab}</td>`+
+      `<td class="b">${r.oos.N}</td>`+
+      `<td class="b ${r.oos.expR>=0?'pos':'neg'}">${r.oos.expR>=0?'+':''}${r.oos.expR.toFixed(2)}R</td>`+
+      `<td class="${r.oos.pf>=1?'pos':'neg'}">${r.oos.pf.toFixed(2)}</td>`+
+      `<td class="${r.is.expR>=0?'pos':'neg'}">${r.is.expR>=0?'+':''}${r.is.expR.toFixed(2)}R</td></tr>`;
+  });
+  h+='</tbody></table></div><div class="tiny muted" style="margin-top:6px">※ 最低スコア='+minScore+'・'+nSym+'銘柄プール。OOS取引が極端に少ない配分は信頼度が低い点に注意。</div>';
+  box.innerHTML=h;
+  box.querySelectorAll('.optrow').forEach(tr=>tr.addEventListener('click',()=>{
+    document.getElementById('sw-rs').value=tr.dataset.rs; document.getElementById('sw-tt').value=tr.dataset.tt; document.getElementById('sw-setup').value=tr.dataset.setup;
+    readScoreW(); reJudge(); reScreen();
+    document.getElementById('opt-status').textContent=`配分 ${tr.dataset.rs}/${tr.dataset.tt}/${tr.dataset.setup} を適用しました`;
+  }));
 }
 // IS/OOS分割の統計を計算（前半=イン・サンプル、後半=アウト・オブ・サンプル）
 function splitStats(d, spy, opts){
@@ -1669,6 +1788,7 @@ document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('bt-run').addEventListener('click',backtest);
 document.getElementById('bt-wl').addEventListener('click',backtestWatchlist);
+document.getElementById('bt-opt').addEventListener('click',optimizeWeights);
 document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); reScreen(); });
 document.getElementById('bench').addEventListener('change',e=>{ localStorage.setItem('bench',e.target.value); _spyCache={data:null,ts:0,source:''}; });
 // 買い候補フィルターのチェックボックス
