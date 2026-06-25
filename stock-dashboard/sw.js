@@ -2,7 +2,7 @@
    - アプリ本体をキャッシュしてオフライン表示（前回結果はlocalStorageから復元）
    - 株価データAPI/プロキシ/TradingViewは常にネットワーク優先（キャッシュしない）
    - 新バージョンは「待機」し、ページの「更新」操作でのみ切替 */
-const CACHE = 'kabu-dash-v22';
+const CACHE = 'kabu-dash-v23';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', e => {

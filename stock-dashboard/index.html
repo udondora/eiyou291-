@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v22<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v23<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -258,6 +258,10 @@ a{color:var(--ac)}
           <option value="SPY">SPY（米国全体）</option>
           <option value="QQQ">QQQ（ハイテク）</option>
         </select>
+      </div>
+      <div class="field">
+        <label class="lbl">IBD RS手入力(任意)</label>
+        <input id="ibdrs" class="t" style="width:120px" inputmode="numeric" placeholder="例 54（空=近似）"/>
       </div>
       <button id="run" class="btn">判定する</button>
       <button id="demo" class="btn alt" title="登録不要・サンプルデータで動作確認">🎬 デモ</button>
@@ -1104,7 +1108,7 @@ function render(sym,d,r){
   document.getElementById('t-half').textContent= r.half!=null? r.half.toFixed(1)+'%':'—';
   setPill('t-hot', r.hot?'ng':'ok', r.hot?'過熱注意':'適温');
 
-  document.getElementById('m-rs').innerHTML= r.rs!=null? `<span class="${r.rs>=CONFIG.rsGood?'pos':'warn'}">${r.rs}</span>` : '—';
+  document.getElementById('m-rs').innerHTML= r.rs!=null? `<span class="${r.rs>=CONFIG.rsGood?'pos':'warn'}">${r.rs}</span>${d.rsManual?' <span class="pill ok">IBD</span>':''}` : '—';
   document.getElementById('m-gain').innerHTML= `<span class="${r.gainFromMA>CONFIG.gainFromMA_hot?'warn':'pos'}">${pct(r.gainFromMA)}</span>`;
   document.getElementById('m-atrmult').innerHTML= r.atrMult!=null? `<span class="${r.atrMult>CONFIG.atrMult_hot?'warn':''}">${r.atrMult.toFixed(2)}</span>`:'—';
   document.getElementById('m-atr').textContent= r.atrPct!=null? r.atrPct.toFixed(2)+'%':'—';
@@ -1296,6 +1300,9 @@ async function run(){
       }
     }catch(e){ /* なしで継続 */ }
 
+    d.rsApprox=d.rs;                 // 近似値を退避
+    const m=parseFloat(document.getElementById('ibdrs').value);
+    if(m>=1&&m<=99){ d.rs=Math.round(m); d.rsManual=true; }  // IBD手入力で上書き
     lastData=d; lastSym=sym;
     const r=judge(d);
     render(sym,d,r);
@@ -1334,6 +1341,8 @@ function runDemo(){
   d.rsSpy1=(pctChange(d.close,21)??0)-(pctChange(spy.close,21)??0);
   d.rsSpy3=(pctChange(d.close,63)??0)-(pctChange(spy.close,63)??0);
   d.marketOK=marketRegime(spy.close);
+  d.rsApprox=d.rs;
+  const mr=parseFloat(document.getElementById('ibdrs').value); if(mr>=1&&mr<=99){ d.rs=Math.round(mr); d.rsManual=true; }
   lastData=d; lastSym='DEMO';
   const r=judge(d);
   render('DEMO',d,r);
@@ -1348,6 +1357,14 @@ function reJudge(){
   const r=judge(lastData);
   render(lastSym==='DEMO'?'DEMO':(lastSym||''), lastData, r);
   if(lastSym==='DEMO') document.getElementById('symlabel').textContent='DEMO（サンプルデータ）';
+}
+// IBD RS手入力の反映（再取得なしで条件8/RS/スコアを更新）
+function applyIbdRs(){
+  if(!lastData) return;
+  const m=parseFloat(document.getElementById('ibdrs').value);
+  lastData.rs = (m>=1&&m<=99)? Math.round(m) : (lastData.rsApprox!=null?lastData.rsApprox:null);
+  lastData.rsManual = (m>=1&&m<=99);
+  reJudge();
 }
 
 /* 最近使った銘柄（最大8件、このブラウザに保存） */
@@ -1608,6 +1625,8 @@ document.getElementById('source').addEventListener('change',e=>{
 document.getElementById('run').addEventListener('click',run);
 document.getElementById('demo').addEventListener('click',runDemo);
 document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
+document.getElementById('symbol').addEventListener('input',()=>{ document.getElementById('ibdrs').value=''; }); // 銘柄変更でIBD RSをクリア
+document.getElementById('ibdrs').addEventListener('input',applyIbdRs);
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('entrypx').addEventListener('input',updatePL);
