@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v16<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v17<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -314,6 +314,48 @@ a{color:var(--ac)}
       </tr></thead>
       <tbody id="scrn-body"></tbody>
     </table></div>
+  </div>
+
+  <!-- バックテスト -->
+  <div class="card">
+    <details id="btbox">
+      <summary class="fsum">🧪 バックテスト <span class="tiny muted">（上の「銘柄」で過去検証）</span></summary>
+      <div class="tiny muted" style="margin-top:6px">過去の各日まで（未来を見ない）で判定を再実行し、買い候補→翌日始値でエントリー、損切り/利確/トレンド崩れで手仕舞いを再現します。取得元は上の設定（長期データのため Twelve Data / Stooq 推奨）。</div>
+      <div class="row" style="margin-top:10px">
+        <div class="field"><label class="lbl">損切り</label>
+          <select id="bt-stop" class="t" style="width:140px"><option value="app">アプリ推奨(スイング/ATR)</option><option value="pct">固定%</option></select>
+        </div>
+        <div class="field"><label class="lbl">固定%（損切り%選択時）</label><input id="bt-stoppct" class="t" style="width:80px" value="8" inputmode="decimal"/></div>
+        <div class="field"><label class="lbl">コスト/取引%</label><input id="bt-cost" class="t" style="width:80px" value="0.1" inputmode="decimal"/></div>
+      </div>
+      <div class="filters2" style="margin-top:8px">
+        <label><input type="checkbox" id="bt-tp" checked> 利確する<span class="sub">／損切り幅の <input id="bt-tpr" class="t" style="width:46px;display:inline-block;min-height:28px;padding:3px 6px" value="2"> 倍(R)で利確</span></label>
+        <label><input type="checkbox" id="bt-trendexit" checked> トレンド崩れで手仕舞い<span class="sub">／trendがNGになったら決済（下落回避）</span></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="bt-run" class="btn">バックテスト実行</button>
+        <span class="tiny muted" id="bt-status"></span>
+      </div>
+      <div id="bt-body" style="display:none;margin-top:12px">
+        <div class="mgrid">
+          <div class="metric"><div class="k">トレード数</div><div class="v" id="bt-n">—</div></div>
+          <div class="metric"><div class="k">勝率</div><div class="v" id="bt-win">—</div></div>
+          <div class="metric"><div class="k">期待値/取引</div><div class="v" id="bt-exp">—</div></div>
+          <div class="metric"><div class="k">プロフィットファクター</div><div class="v" id="bt-pf">—</div></div>
+          <div class="metric"><div class="k">平均利益</div><div class="v" id="bt-aw">—</div></div>
+          <div class="metric"><div class="k">平均損失</div><div class="v" id="bt-al">—</div></div>
+          <div class="metric"><div class="k">合計リターン(複利)</div><div class="v" id="bt-tot">—</div></div>
+          <div class="metric"><div class="k">最大ドローダウン</div><div class="v" id="bt-dd">—</div></div>
+          <div class="metric"><div class="k">Buy&amp;Hold（同期間）</div><div class="v" id="bt-bh">—</div></div>
+          <div class="metric"><div class="k">平均保有</div><div class="v" id="bt-days">—</div></div>
+        </div>
+        <div class="scrwrap" style="margin-top:10px"><table class="scrn">
+          <thead><tr><th>建値</th><th>決済</th><th>損益</th><th>保有</th><th>理由</th></tr></thead>
+          <tbody id="bt-trades"></tbody>
+        </table></div>
+        <div class="notice" style="margin-top:10px">⚠️ <b>解釈の注意</b>：単一銘柄・限られた期間の<b>イン・サンプル</b>検証です（取引数が少なく統計的信頼度は低い）。スリッページ/約定の理想化、データの分割調整差もあります。結果は<b>参考</b>に留め、複数銘柄・複数期間で確認を。</div>
+      </div>
+    </details>
   </div>
 
   <!-- 判定結果 -->
@@ -858,8 +900,9 @@ function analyzeOptions(opt){
   const gp = ap? bsGreeks('put', S,atmK,T,r,ap.iv):null;
   return {S,T,atmK,ac,ap,atmIV,emPct,emAbs,straddle,pcOI,pcVol,gc,gp};
 }
-async function fetchTwelve(sym,key){
-  const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=400&order=ASC&apikey=${encodeURIComponent(key)}`;
+async function fetchTwelve(sym,key,outputsize){
+  const sz=outputsize||400;
+  const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=${sz}&order=ASC&apikey=${encodeURIComponent(key)}`;
   const res=await fetch(url); const j=await res.json();
   if(j.status==='error') throw new Error('Twelve Data: '+j.message);
   const v=j.values; if(!v||!v.length) throw new Error('Twelve Dataからデータなし');
@@ -1091,16 +1134,17 @@ async function tdThrottle(onWait){
   }
   _tdCalls.push(Date.now());
 }
-async function fetchSeries(sym, source, onWait){
+async function fetchSeries(sym, source, onWait, long){
   if(source==='twelvedata'){
     const key=document.getElementById('tdkey').value.trim();
     if(!key) throw new Error('Twelve DataのAPIキー未入力');
     localStorage.setItem('td_key',key);
     await tdThrottle(onWait);
-    return await fetchTwelve(sym,key);
+    return await fetchTwelve(sym,key, long?2000:400);
   }
-  if(source==='stooq') return await fetchStooq(sym);
-  throw new Error('CSVは単体判定のみ対応');
+  if(source==='stooq') return await fetchStooq(sym); // Stooqは全期間
+  if(source==='csv') return parseCSV(document.getElementById('csv').value);
+  throw new Error('未対応の取得元');
 }
 // SPYベンチマークを10分キャッシュ（RS計算用・API節約）
 let _spyCache={data:null,ts:0,source:''};
@@ -1295,6 +1339,96 @@ function exportCSV(){
   const a=document.createElement('a'); a.href=url; a.download='screening.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
+/* ===== バックテスト ===== */
+// 過去の各日まで(未来を見ない)でjudgeを再実行→買い候補で翌日始値エントリー、損切り/利確/トレンド崩れで手仕舞い
+function runBacktest(d, spyCloses, opts){
+  const n=d.close.length, warm=Math.min(253, n-5);
+  if(n < warm+20) return {error:'履歴が不足（長期データが必要。Twelve Data/Stooq推奨）'};
+  let pos=null; const trades=[];
+  for(let i=warm;i<n-1;i++){
+    const len=i+1;
+    const ds={time:d.time.slice(0,len),open:d.open.slice(0,len),high:d.high.slice(0,len),low:d.low.slice(0,len),close:d.close.slice(0,len),volume:d.volume.slice(0,len)};
+    ds.rs= spyCloses? rsRatingApprox(ds.close, spyCloses.slice(0,len)) : null;
+    ds.marketOK= spyCloses? marketRegime(spyCloses.slice(0,len)) : null;
+    const r=judge(ds);
+    if(!pos){
+      if(r.action.indexOf('買い候補')===0){
+        const entry=(d.open[i+1]!=null&&d.open[i+1]>0)?d.open[i+1]:d.close[i];
+        let stop= opts.stopMode==='pct'? entry*(1-opts.stopPct/100) : r.levels.stop;
+        if(!(stop<entry)) stop=entry*(1-(opts.stopPct||8)/100);
+        pos={ei:i+1,entry,stop,risk:entry-stop};
+      }
+    } else {
+      const lo=d.low[i],hi=d.high[i],cl=d.close[i],op=d.open[i];
+      let exit=null,why='';
+      if(lo<=pos.stop){ exit=(op<pos.stop)?op:pos.stop; why='損切り'; }            // ギャップ割れは寄りで約定
+      else if(opts.tp && hi>=pos.entry+opts.tpR*pos.risk){ exit=pos.entry+opts.tpR*pos.risk; why=opts.tpR+'R利確'; }
+      else if(opts.trendExit && r.trend!=='OK'){ exit=cl; why='トレンド崩れ'; }
+      if(exit!=null){ const ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({ei:pos.ei,xi:i,entry:pos.entry,stop:pos.stop,exit,ret,days:i-pos.ei,why}); pos=null; }
+    }
+  }
+  if(pos){ const i=n-1, exit=d.close[i], ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({ei:pos.ei,xi:i,entry:pos.entry,stop:pos.stop,exit,ret,days:i-pos.ei,why:'最終'}); }
+  const N=trades.length, sum=a=>a.reduce((s,x)=>s+x,0);
+  const wins=trades.filter(t=>t.ret>0), losses=trades.filter(t=>t.ret<=0);
+  const gW=sum(wins.map(t=>t.ret)), gL=Math.abs(sum(losses.map(t=>t.ret)));
+  const Rs=trades.map(t=>{const rk=(t.entry-t.stop)/t.entry*100;return rk>0?t.ret/rk:0;});
+  let eq=100,peak=100,maxDD=0; const curve=[100]; trades.forEach(t=>{eq*=(1+t.ret/100);curve.push(eq);peak=Math.max(peak,eq);maxDD=Math.max(maxDD,(peak-eq)/peak*100);});
+  const years=(n-warm)/252;
+  const bh=(d.close[n-1]/d.close[warm]-1)*100;
+  return {N,winRate:N?wins.length/N*100:0,avgWin:wins.length?gW/wins.length:0,avgLoss:losses.length?-gL/losses.length:0,
+    pf:gL?gW/gL:(gW>0?99:0),expR:N?sum(Rs)/N:0,totalRet:eq-100,maxDD,avgDays:N?sum(trades.map(t=>t.days))/N:0,bh,years,curve,trades};
+}
+function btOpts(){
+  return {
+    stopMode: document.getElementById('bt-stop').value,
+    stopPct: parseFloat(document.getElementById('bt-stoppct').value)||8,
+    tp: document.getElementById('bt-tp').checked,
+    tpR: parseFloat(document.getElementById('bt-tpr').value)||2,
+    trendExit: document.getElementById('bt-trendexit').checked,
+    cost: parseFloat(document.getElementById('bt-cost').value)||0
+  };
+}
+async function backtest(){
+  const sym=document.getElementById('symbol').value.trim().toUpperCase();
+  const source=document.getElementById('source').value;
+  const st=document.getElementById('bt-status'); const body=document.getElementById('bt-body');
+  if(!sym && source!=='csv'){ st.textContent='銘柄を入力してください'; return; }
+  const btn=document.getElementById('bt-run'); btn.disabled=true; btn.textContent='実行中…';
+  try{
+    st.textContent='長期データ取得中…';
+    const d=await fetchSeries(sym, source, null, true);
+    let spy=null; try{ const s=await fetchSeries(benchSym(), source, null, true); spy=s.close; }catch(e){}
+    st.textContent='シミュレーション中…';
+    const r=runBacktest(d, spy, btOpts());
+    if(r.error){ st.textContent=r.error; body.style.display='none'; return; }
+    renderBacktest(sym, r);
+    st.textContent=`完了：${r.trades.length}トレード / 期間 約${r.years.toFixed(1)}年`;
+  }catch(e){ st.textContent='失敗：'+(e.message||e); }
+  finally{ btn.disabled=false; btn.textContent='バックテスト実行'; }
+}
+function renderBacktest(sym, r){
+  const body=document.getElementById('bt-body'); body.style.display='block';
+  const g=(id,v)=>document.getElementById(id).innerHTML=v;
+  const col=v=>v>=0?'pos':'neg';
+  g('bt-n', r.N);
+  g('bt-win', `<span class="${r.winRate>=50?'pos':'warn'}">${r.winRate.toFixed(0)}%</span>`);
+  g('bt-aw', `<span class="pos">+${r.avgWin.toFixed(1)}%</span>`);
+  g('bt-al', `<span class="neg">${r.avgLoss.toFixed(1)}%</span>`);
+  g('bt-exp', `<span class="${col(r.expR)}">${r.expR>=0?'+':''}${r.expR.toFixed(2)}R</span>`);
+  g('bt-pf', `<span class="${r.pf>=1?'pos':'neg'}">${r.pf.toFixed(2)}</span>`);
+  g('bt-tot', `<span class="${col(r.totalRet)}">${r.totalRet>=0?'+':''}${r.totalRet.toFixed(0)}%</span>`);
+  g('bt-dd', `<span class="warn">-${r.maxDD.toFixed(0)}%</span>`);
+  g('bt-bh', `<span class="${col(r.bh)}">${r.bh>=0?'+':''}${r.bh.toFixed(0)}%</span>`);
+  g('bt-days', r.avgDays.toFixed(0)+'日');
+  // 直近トレード(最大12件)
+  const tb=document.getElementById('bt-trades'); tb.innerHTML='';
+  r.trades.slice(-12).reverse().forEach(t=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${fmt(t.entry)}</td><td>${fmt(t.exit)}</td><td class="${t.ret>=0?'pos':'neg'} b">${t.ret>=0?'+':''}${t.ret.toFixed(1)}%</td><td>${t.days}日</td><td class="muted">${t.why}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
 /* UI wiring */
 document.getElementById('source').addEventListener('change',e=>{
   document.getElementById('tdkeywrap').style.display = e.target.value==='twelvedata'?'flex':'none';
@@ -1307,6 +1441,7 @@ document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
+document.getElementById('bt-run').addEventListener('click',backtest);
 document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); reScreen(); });
 document.getElementById('bench').addEventListener('change',e=>{ localStorage.setItem('bench',e.target.value); _spyCache={data:null,ts:0,source:''}; });
 // 買い候補フィルターのチェックボックス
