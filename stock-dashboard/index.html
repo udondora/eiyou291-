@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v17<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v18<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -331,12 +331,22 @@ a{color:var(--ac)}
       <div class="filters2" style="margin-top:8px">
         <label><input type="checkbox" id="bt-tp" checked> 利確する<span class="sub">／損切り幅の <input id="bt-tpr" class="t" style="width:46px;display:inline-block;min-height:28px;padding:3px 6px" value="2"> 倍(R)で利確</span></label>
         <label><input type="checkbox" id="bt-trendexit" checked> トレンド崩れで手仕舞い<span class="sub">／trendがNGになったら決済（下落回避）</span></label>
+        <label><input type="checkbox" id="bt-oos"> アウト・オブ・サンプル分割<span class="sub">／前半(IS)で見た傾向が後半(OOS=未知データ)でも保つか比較（カーブフィッティング対策）</span></label>
       </div>
       <div class="row" style="margin-top:10px">
         <button id="bt-run" class="btn">バックテスト実行</button>
+        <button id="bt-wl" class="btn alt">🗂 ウォッチリスト全体</button>
         <span class="tiny muted" id="bt-status"></span>
       </div>
       <div id="bt-body" style="display:none;margin-top:12px">
+        <div class="tiny muted" style="margin-bottom:8px">対象: <b id="bt-label" style="color:var(--ac)"></b></div>
+        <div id="bt-ooswrap" style="display:none;margin-bottom:12px">
+          <div class="tiny muted" style="margin-bottom:4px">イン/アウト・オブ・サンプル比較（後半=未知データで成績が崩れていないかが重要）</div>
+          <div class="scrwrap"><table class="scrn">
+            <thead><tr><th>期間</th><th>取引</th><th>勝率</th><th>期待値</th><th>合計</th><th>PF</th></tr></thead>
+            <tbody id="bt-oosbody"></tbody>
+          </table></div>
+        </div>
         <div class="mgrid">
           <div class="metric"><div class="k">トレード数</div><div class="v" id="bt-n">—</div></div>
           <div class="metric"><div class="k">勝率</div><div class="v" id="bt-win">—</div></div>
@@ -1341,11 +1351,12 @@ function exportCSV(){
 
 /* ===== バックテスト ===== */
 // 過去の各日まで(未来を見ない)でjudgeを再実行→買い候補で翌日始値エントリー、損切り/利確/トレンド崩れで手仕舞い
-function runBacktest(d, spyCloses, opts){
+// 評価バー範囲[iFrom,iTo)でシミュレーション。judgeは常に0..iの全履歴で計算（ルックアヘッドなし）。
+function simulate(d, spyCloses, opts, iFrom, iTo){
   const n=d.close.length, warm=Math.min(253, n-5);
-  if(n < warm+20) return {error:'履歴が不足（長期データが必要。Twelve Data/Stooq推奨）'};
+  const lo=Math.max(warm, iFrom==null?warm:iFrom), hi=Math.min(n-1, iTo==null?(n-1):iTo);
   let pos=null; const trades=[];
-  for(let i=warm;i<n-1;i++){
+  for(let i=lo;i<hi;i++){
     const len=i+1;
     const ds={time:d.time.slice(0,len),open:d.open.slice(0,len),high:d.high.slice(0,len),low:d.low.slice(0,len),close:d.close.slice(0,len),volume:d.volume.slice(0,len)};
     ds.rs= spyCloses? rsRatingApprox(ds.close, spyCloses.slice(0,len)) : null;
@@ -1359,24 +1370,34 @@ function runBacktest(d, spyCloses, opts){
         pos={ei:i+1,entry,stop,risk:entry-stop};
       }
     } else {
-      const lo=d.low[i],hi=d.high[i],cl=d.close[i],op=d.open[i];
+      const l=d.low[i],h=d.high[i],cl=d.close[i],op=d.open[i];
       let exit=null,why='';
-      if(lo<=pos.stop){ exit=(op<pos.stop)?op:pos.stop; why='損切り'; }            // ギャップ割れは寄りで約定
-      else if(opts.tp && hi>=pos.entry+opts.tpR*pos.risk){ exit=pos.entry+opts.tpR*pos.risk; why=opts.tpR+'R利確'; }
+      if(l<=pos.stop){ exit=(op<pos.stop)?op:pos.stop; why='損切り'; }
+      else if(opts.tp && h>=pos.entry+opts.tpR*pos.risk){ exit=pos.entry+opts.tpR*pos.risk; why=opts.tpR+'R利確'; }
       else if(opts.trendExit && r.trend!=='OK'){ exit=cl; why='トレンド崩れ'; }
       if(exit!=null){ const ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({ei:pos.ei,xi:i,entry:pos.entry,stop:pos.stop,exit,ret,days:i-pos.ei,why}); pos=null; }
     }
   }
-  if(pos){ const i=n-1, exit=d.close[i], ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({ei:pos.ei,xi:i,entry:pos.entry,stop:pos.stop,exit,ret,days:i-pos.ei,why:'最終'}); }
+  if(pos){ const exit=d.close[hi], ret=(exit/pos.entry-1)*100-(opts.cost||0); trades.push({ei:pos.ei,xi:hi,entry:pos.entry,stop:pos.stop,exit,ret,days:hi-pos.ei,why:'期末'}); }
+  return {trades, lo, hi};
+}
+function btStats(trades){
   const N=trades.length, sum=a=>a.reduce((s,x)=>s+x,0);
   const wins=trades.filter(t=>t.ret>0), losses=trades.filter(t=>t.ret<=0);
   const gW=sum(wins.map(t=>t.ret)), gL=Math.abs(sum(losses.map(t=>t.ret)));
   const Rs=trades.map(t=>{const rk=(t.entry-t.stop)/t.entry*100;return rk>0?t.ret/rk:0;});
-  let eq=100,peak=100,maxDD=0; const curve=[100]; trades.forEach(t=>{eq*=(1+t.ret/100);curve.push(eq);peak=Math.max(peak,eq);maxDD=Math.max(maxDD,(peak-eq)/peak*100);});
-  const years=(n-warm)/252;
-  const bh=(d.close[n-1]/d.close[warm]-1)*100;
+  let eq=100,peak=100,maxDD=0; trades.forEach(t=>{eq*=(1+t.ret/100);peak=Math.max(peak,eq);maxDD=Math.max(maxDD,(peak-eq)/peak*100);});
   return {N,winRate:N?wins.length/N*100:0,avgWin:wins.length?gW/wins.length:0,avgLoss:losses.length?-gL/losses.length:0,
-    pf:gL?gW/gL:(gW>0?99:0),expR:N?sum(Rs)/N:0,totalRet:eq-100,maxDD,avgDays:N?sum(trades.map(t=>t.days))/N:0,bh,years,curve,trades};
+    pf:gL?gW/gL:(gW>0?99:0),expR:N?sum(Rs)/N:0,totalRet:eq-100,maxDD,avgDays:N?sum(trades.map(t=>t.days))/N:0,trades};
+}
+function runBacktest(d, spyCloses, opts){
+  const n=d.close.length, warm=Math.min(253, n-5);
+  if(n < warm+20) return {error:'履歴が不足（長期データが必要。Twelve Data/Stooq推奨）'};
+  const full=simulate(d, spyCloses, opts);
+  const s=btStats(full.trades);
+  s.bh=(d.close[full.hi]/d.close[full.lo]-1)*100;
+  s.years=(full.hi-full.lo)/252;
+  return s;
 }
 function btOpts(){
   return {
@@ -1387,6 +1408,13 @@ function btOpts(){
     trendExit: document.getElementById('bt-trendexit').checked,
     cost: parseFloat(document.getElementById('bt-cost').value)||0
   };
+}
+// IS/OOS分割の統計を計算（前半=イン・サンプル、後半=アウト・オブ・サンプル）
+function splitStats(d, spy, opts){
+  const n=d.close.length, warm=Math.min(253,n-5), mid=Math.floor((warm+(n-1))/2);
+  const is=btStats(simulate(d,spy,opts,warm,mid).trades);
+  const oos=btStats(simulate(d,spy,opts,mid,n-1).trades);
+  return {is,oos};
 }
 async function backtest(){
   const sym=document.getElementById('symbol').value.trim().toUpperCase();
@@ -1399,15 +1427,54 @@ async function backtest(){
     const d=await fetchSeries(sym, source, null, true);
     let spy=null; try{ const s=await fetchSeries(benchSym(), source, null, true); spy=s.close; }catch(e){}
     st.textContent='シミュレーション中…';
-    const r=runBacktest(d, spy, btOpts());
+    const opts=btOpts();
+    const r=runBacktest(d, spy, opts);
     if(r.error){ st.textContent=r.error; body.style.display='none'; return; }
-    renderBacktest(sym, r);
+    const split=document.getElementById('bt-oos').checked? splitStats(d,spy,opts): null;
+    renderBacktest('銘柄 '+sym, r, split);
     st.textContent=`完了：${r.trades.length}トレード / 期間 約${r.years.toFixed(1)}年`;
   }catch(e){ st.textContent='失敗：'+(e.message||e); }
   finally{ btn.disabled=false; btn.textContent='バックテスト実行'; }
 }
-function renderBacktest(sym, r){
+// ウォッチリスト全体でプール検証（取引を合算して信頼度UP）
+async function backtestWatchlist(){
+  const source=document.getElementById('source').value;
+  if(source==='csv'){ document.getElementById('bt-status').textContent='CSVはプール検証非対応'; return; }
+  const syms=[...new Set((document.getElementById('wl').value||'').split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))].slice(0,15);
+  if(!syms.length){ document.getElementById('bt-status').textContent='ウォッチリストに銘柄を入力'; return; }
+  const st=document.getElementById('bt-status'); const btn=document.getElementById('bt-wl'); btn.disabled=true; btn.textContent='実行中…';
+  const opts=btOpts(); const oosOn=document.getElementById('bt-oos').checked;
+  try{
+    let spy=null; try{ st.textContent='ベンチマーク取得中…'; const s=await fetchSeries(benchSym(),source,null,true); spy=s.close; }catch(e){}
+    const pooled=[], isP=[], oosP=[]; let okN=0, bhSum=0;
+    for(let i=0;i<syms.length;i++){
+      const sym=syms[i]; st.textContent=`検証中 ${i+1}/${syms.length}: ${sym}`;
+      try{
+        const d=await fetchSeries(sym,source,sec=>st.textContent=`レート制限待機 ${sec}s…`,true);
+        const f=simulate(d,spy,opts); pooled.push(...f.trades); okN++;
+        bhSum+=(d.close[f.hi]/d.close[f.lo]-1)*100;
+        if(oosOn){ const sp=splitStats(d,spy,opts); isP.push(...sp.is.trades); oosP.push(...sp.oos.trades); }
+      }catch(e){ /* 失敗銘柄はスキップ */ }
+      if(i<syms.length-1) await sleep(source==='twelvedata'?200:300);
+    }
+    if(!pooled.length){ st.textContent='有効なトレードが得られませんでした（銘柄/期間を確認）'; return; }
+    const r=btStats(pooled); r.bh=okN?bhSum/okN:0; r.years=0;
+    const split=oosOn? {is:btStats(isP), oos:btStats(oosP)} : null;
+    renderBacktest(`ウォッチリスト${okN}銘柄プール`, r, split);
+    st.textContent=`完了：${okN}/${syms.length}銘柄 / 合計${pooled.length}トレード`;
+  }catch(e){ st.textContent='失敗：'+(e.message||e); }
+  finally{ btn.disabled=false; btn.textContent='🗂 ウォッチリスト全体'; }
+}
+function renderBacktest(label, r, split){
   const body=document.getElementById('bt-body'); body.style.display='block';
+  document.getElementById('bt-label').textContent=label;
+  // OOS比較表
+  const oosWrap=document.getElementById('bt-ooswrap');
+  if(split){
+    oosWrap.style.display='block';
+    const row=(name,s)=>`<tr><td class="k">${name}</td><td class="b">${s.N}</td><td class="b ${s.winRate>=50?'pos':'warn'}">${s.winRate.toFixed(0)}%</td><td class="b ${s.expR>=0?'pos':'neg'}">${s.expR>=0?'+':''}${s.expR.toFixed(2)}R</td><td class="${s.totalRet>=0?'pos':'neg'}">${s.totalRet>=0?'+':''}${s.totalRet.toFixed(0)}%</td><td class="${s.pf>=1?'pos':'neg'}">${s.pf.toFixed(2)}</td></tr>`;
+    document.getElementById('bt-oosbody').innerHTML=row('前半 IS',split.is)+row('後半 OOS',split.oos);
+  } else oosWrap.style.display='none';
   const g=(id,v)=>document.getElementById(id).innerHTML=v;
   const col=v=>v>=0?'pos':'neg';
   g('bt-n', r.N);
@@ -1442,6 +1509,7 @@ document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('bt-run').addEventListener('click',backtest);
+document.getElementById('bt-wl').addEventListener('click',backtestWatchlist);
 document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); reScreen(); });
 document.getElementById('bench').addEventListener('change',e=>{ localStorage.setItem('bench',e.target.value); _spyCache={data:null,ts:0,source:''}; });
 // 買い候補フィルターのチェックボックス
