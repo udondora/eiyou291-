@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v20<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v21<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -413,6 +413,19 @@ a{color:var(--ac)}
 
     <div class="card">
       <h2>③ 価格レベル（目安）</h2>
+      <div class="row" style="margin-bottom:6px">
+        <div class="field"><label class="lbl">損切り基準</label>
+          <select id="stopbasis" class="t" style="width:170px">
+            <option value="app">アプリ推奨（スイング/ATRの高い方）</option>
+            <option value="swing">スイング安値（直近10日）</option>
+            <option value="atr">ATR×倍率（ボラ調整）</option>
+            <option value="ema21">21EMA直下（タイト・スイング向け）</option>
+            <option value="pct">固定%</option>
+          </select>
+        </div>
+        <div class="field"><label class="lbl">ATR倍率</label><input id="stopatr" class="t" style="width:70px" value="2" inputmode="decimal"/></div>
+        <div class="field"><label class="lbl">固定%</label><input id="stoppct" class="t" style="width:70px" value="8" inputmode="decimal"/></div>
+      </div>
       <div class="lv">
         <div class="lvbox"><div class="k">現値</div><div class="v" id="lv-close">—</div></div>
         <div class="lvbox"><div class="k">直近スイング安値(10日)</div><div class="v" id="lv-swing">—</div></div>
@@ -498,7 +511,11 @@ const CONFIG = {
   rsGood:70,              // RS Rating近似がこの値以上で良好
   maxRiskPct:10,          // 損切り幅(現値→損切り)がこの%超なら買い候補から除外
   minDollarVol:3e6,       // 平均売買代金(出来高×株価)がこの値未満なら除外
+  stopBasis:'app',        // 損切り基準: app/swing/atr/ema21/pct
+  stopATRmult:2,          // ATR基準の倍率
+  stopPctVal:8,           // 固定%基準の値
 };
+function applyStop(o){ Object.assign(CONFIG,o); }
 // 買い候補フィルター（各ON/OFFで有効/無効。OFF=その条件で弾かない）
 const FILTERS = { market:true, pullback:true, breakout:true, rs:true, risk:true, liq:false, weekly:false };
 function applyFilters(o){ Object.assign(FILTERS,o); }
@@ -670,12 +687,21 @@ function judge(d){
   // --- 価格レベル（損切り・利確・R）※フィルターで使うので先に算出 ---
   let swingLow=Infinity;
   for(let i=Math.max(0,n-9);i<=n;i++) swingLow=Math.min(swingLow,d.low[i]);
-  const stopATR= atrv!=null? close-2*atrv : null;
-  let stop = stopATR!=null? Math.max(swingLow, stopATR) : swingLow; // 下方の論理的支持の高い方
-  if(!(stop<close)) stop = stopATR!=null? stopATR : close*0.95;     // 現値以上なら無効→ATR/5%
+  const stopATR= atrv!=null? close-CONFIG.stopATRmult*atrv : null;
+  // 損切り基準（CONFIG.stopBasisで切替）
+  let stopRaw;
+  switch(CONFIG.stopBasis){
+    case 'swing': stopRaw=swingLow; break;
+    case 'atr':   stopRaw=stopATR; break;
+    case 'ema21': stopRaw=(ema21!=null)? Math.min(ema21*0.99, ema21-(atrv?0.3*atrv:0)) : null; break; // 21EMA直下
+    case 'pct':   stopRaw=close*(1-CONFIG.stopPctVal/100); break;
+    default:      stopRaw=(stopATR!=null)? Math.max(swingLow, stopATR) : swingLow; // app=高い方
+  }
+  let stop = stopRaw;
+  if(stop==null || !(stop<close)) stop = (stopATR!=null && stopATR<close)? stopATR : close*0.95; // 無効時フォールバック
   const riskPerShare = close-stop;
   const riskPct = riskPerShare/close*100;
-  const levels={ swingLow, stop, stopATR, riskPerShare, riskPct,
+  const levels={ swingLow, stop, stopATR, riskPerShare, riskPct, stopBasis:CONFIG.stopBasis,
     target2R: close+2*riskPerShare, target3R: close+3*riskPerShare };
 
   const rs = d.rs; // 事前計算
@@ -1595,6 +1621,9 @@ const FILTER_IDS={market:'f-market',pullback:'f-pullback',breakout:'f-breakout',
 function readFilters(){ const o={}; for(const k in FILTER_IDS) o[k]=document.getElementById(FILTER_IDS[k]).checked; applyFilters(o); localStorage.setItem('filters',JSON.stringify(o));
   const on=Object.values(o).filter(Boolean).length, tot=Object.keys(o).length; const fc=document.getElementById('filtcount'); if(fc) fc.textContent=`（有効 ${on}/${tot}）`; }
 Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListener('change',()=>{ readFilters(); reJudge(); reScreen(); }));
+// 損切り基準
+function readStop(){ const o={stopBasis:document.getElementById('stopbasis').value, stopATRmult:parseFloat(document.getElementById('stopatr').value)||2, stopPctVal:parseFloat(document.getElementById('stoppct').value)||8}; applyStop(o); localStorage.setItem('stop',JSON.stringify(o)); }
+['stopbasis','stopatr','stoppct'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ readStop(); reJudge(); reScreen(); }));
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
   const k=th.dataset.k;
   if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
@@ -1623,6 +1652,9 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   // フィルター状態を復元
   try{ const sf=JSON.parse(localStorage.getItem('filters')||'null'); if(sf){ for(const k in FILTER_IDS){ if(typeof sf[k]==='boolean') document.getElementById(FILTER_IDS[k]).checked=sf[k]; } } }catch(e){}
   readFilters();
+  // 損切り基準を復元
+  try{ const ss=JSON.parse(localStorage.getItem('stop')||'null'); if(ss){ if(ss.stopBasis) document.getElementById('stopbasis').value=ss.stopBasis; if(ss.stopATRmult) document.getElementById('stopatr').value=ss.stopATRmult; if(ss.stopPctVal) document.getElementById('stoppct').value=ss.stopPctVal; } }catch(e){}
+  readStop();
   const bench=localStorage.getItem('bench'); if(bench) document.getElementById('bench').value=bench;
   // 文字サイズ復元
   const fs=localStorage.getItem('fontscale'); if(fs) document.documentElement.style.fontSize=fs;
