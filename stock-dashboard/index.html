@@ -31,6 +31,10 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,Bli
 .scorebadge .track{flex:1;height:10px;border-radius:999px;background:var(--soft);overflow:hidden}
 .scorebadge .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ac),var(--teal))}
 .bo{display:inline-block;background:rgba(56,189,248,.16);color:var(--ac);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:900;margin-left:6px}
+#updbar{display:none;position:sticky;top:0;z-index:30;background:linear-gradient(135deg,var(--ac),var(--teal));color:#00110e;font-weight:900;font-size:13px;text-align:center;padding:9px 12px;cursor:pointer}
+#fabs{position:fixed;right:14px;bottom:16px;z-index:25;display:flex;flex-direction:column;gap:8px}
+.fab{width:46px;height:46px;border-radius:50%;border:1px solid var(--bd);background:rgba(23,32,51,.95);color:var(--tx);font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);display:none;align-items:center;justify-content:center}
+.fab.show{display:flex}
 .wrap{max-width:920px;margin:0 auto;padding:16px 14px 60px}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .field{display:flex;flex-direction:column;gap:5px}
@@ -78,6 +82,10 @@ table.jt td.v{font-weight:900}
 .notice{border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.08);color:#e8df86;border-radius:12px;padding:10px 12px;font-weight:700;font-size:12px;margin:10px 0}
 .err{border:1px solid rgba(239,68,68,.5);background:rgba(239,68,68,.1);color:#fca5a5;border-radius:12px;padding:10px 12px;font-weight:800;font-size:13px;margin:10px 0;display:none}
 details summary{cursor:pointer;font-weight:800;color:var(--ac);font-size:13px}
+summary.fsum{font-size:14px;color:var(--ac);font-weight:900;letter-spacing:.02em;list-style:none;padding:2px 0}
+summary.fsum::-webkit-details-marker{display:none}
+summary.fsum::before{content:'▸';margin-right:6px;color:var(--muted)}
+details[open] summary.fsum::before{content:'▾'}
 .reasons{font-size:12px;color:var(--muted);margin:8px 0 0;padding-left:18px}
 .reasons li{margin:3px 0}
 a{color:var(--ac)}
@@ -198,12 +206,14 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div style="display:flex;align-items:center;gap:8px">
+  <div style="display:flex;align-items:center;gap:6px">
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
-    <div class="hs" style="text-align:right">v14<br><span id="build" style="font-weight:700"></span></div>
+    <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
+    <div class="hs" style="text-align:right">v15<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
+<div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
 
 <div class="wrap">
 
@@ -266,17 +276,19 @@ a{color:var(--ac)}
 
   <!-- 買い候補フィルター -->
   <div class="card">
-    <h2>🔧 買い候補フィルター <span class="tiny muted">（OFFで無効化＝その条件で弾かない）</span></h2>
-    <div class="filters2">
-      <label><input type="checkbox" id="f-market" checked> 地合いフィルター<span class="sub">／SPYが上昇トレンド(50・200日線の上)の時だけ「買い候補」</span></label>
-      <label><input type="checkbox" id="f-pullback" checked> 健全な押し目のみ<span class="sub">／50日線の上＋反発確認（崩れている押し目は除外）</span></label>
-      <label><input type="checkbox" id="f-breakout" checked> ブレイクは52週高値圏のみ<span class="sub">／高値−8%以内のブレイクだけ買い候補</span></label>
-      <label><input type="checkbox" id="f-rs" checked> RS≥70 必須<span class="sub">／相対的に弱い銘柄は買い候補にしない</span></label>
-      <label><input type="checkbox" id="f-risk" checked> 損切り幅が大きい銘柄を除外<span class="sub">／現値→損切りが10%超は見送り</span></label>
-      <label><input type="checkbox" id="f-liq"> 流動性フィルター<span class="sub">／平均売買代金が小さい銘柄(約300万ドル未満)を除外</span></label>
-      <label><input type="checkbox" id="f-weekly"> 週足も上昇のみ<span class="sub">／30週線(≒150日)の上＋上向き(ステージ2)だけ買い候補</span></label>
-    </div>
-    <div class="tiny muted" style="margin-top:8px">変更すると、表示中の判定とスクリーニング表の両方がすぐ再評価されます（再取得なし）。</div>
+    <details id="filterbox">
+      <summary class="fsum">🔧 買い候補フィルター <span id="filtcount" class="tiny muted"></span></summary>
+      <div class="filters2">
+        <label><input type="checkbox" id="f-market" checked> 地合いフィルター<span class="sub">／SPYが上昇トレンド(50・200日線の上)の時だけ「買い候補」</span></label>
+        <label><input type="checkbox" id="f-pullback" checked> 健全な押し目のみ<span class="sub">／50日線の上＋反発確認（崩れている押し目は除外）</span></label>
+        <label><input type="checkbox" id="f-breakout" checked> ブレイクは52週高値圏のみ<span class="sub">／高値−8%以内のブレイクだけ買い候補</span></label>
+        <label><input type="checkbox" id="f-rs" checked> RS≥70 必須<span class="sub">／相対的に弱い銘柄は買い候補にしない</span></label>
+        <label><input type="checkbox" id="f-risk" checked> 損切り幅が大きい銘柄を除外<span class="sub">／現値→損切りが10%超は見送り</span></label>
+        <label><input type="checkbox" id="f-liq"> 流動性フィルター<span class="sub">／平均売買代金が小さい銘柄(約300万ドル未満)を除外</span></label>
+        <label><input type="checkbox" id="f-weekly"> 週足も上昇のみ<span class="sub">／30週線(≒150日)の上＋上向き(ステージ2)だけ買い候補</span></label>
+      </div>
+      <div class="tiny muted" style="margin-top:8px">変更すると、表示中の判定とスクリーニング表の両方がすぐ再評価されます（再取得なし）。OFFで無効化＝その条件で弾かない。</div>
+    </details>
   </div>
 
   <!-- ウォッチリスト・スクリーニング -->
@@ -385,6 +397,8 @@ a{color:var(--ac)}
     行動＝上記を統合（買い候補／保有／待機／利確）。閾値はコード先頭の CONFIG で調整可能。
   </div>
 </div>
+
+<div id="fabs"><button class="fab" id="fab-top" aria-label="トップへ戻る">↑</button></div>
 
 <script src="https://s3.tradingview.com/tv.js"></script>
 <script>
@@ -1285,7 +1299,8 @@ document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.t
 document.getElementById('bench').addEventListener('change',e=>{ localStorage.setItem('bench',e.target.value); _spyCache={data:null,ts:0,source:''}; });
 // 買い候補フィルターのチェックボックス
 const FILTER_IDS={market:'f-market',pullback:'f-pullback',breakout:'f-breakout',rs:'f-rs',risk:'f-risk',liq:'f-liq',weekly:'f-weekly'};
-function readFilters(){ const o={}; for(const k in FILTER_IDS) o[k]=document.getElementById(FILTER_IDS[k]).checked; applyFilters(o); localStorage.setItem('filters',JSON.stringify(o)); }
+function readFilters(){ const o={}; for(const k in FILTER_IDS) o[k]=document.getElementById(FILTER_IDS[k]).checked; applyFilters(o); localStorage.setItem('filters',JSON.stringify(o));
+  const on=Object.values(o).filter(Boolean).length, tot=Object.keys(o).length; const fc=document.getElementById('filtcount'); if(fc) fc.textContent=`（有効 ${on}/${tot}）`; }
 Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListener('change',()=>{ readFilters(); reJudge(); reScreen(); }));
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
   const k=th.dataset.k;
@@ -1328,8 +1343,36 @@ function setFont(delta){
   const nv=Math.max(13,Math.min(20,cur+delta))+'px';
   document.documentElement.style.fontSize=nv; localStorage.setItem('fontscale',nv);
 }
-// PWA: Service Worker登録（オフライン/ホーム画面アプリ化）
-if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+// 手動更新：キャッシュ全消去＋SW更新＋リロード（確実に最新化）
+async function hardRefresh(){
+  try{
+    if('serviceWorker' in navigator){ const rs=await navigator.serviceWorker.getRegistrations(); for(const r of rs) await r.update(); }
+    if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+  }catch(e){}
+  location.reload();
+}
+// PWA: Service Worker登録＋新バージョン検知バナー
+let _refreshing=false;
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(_refreshing)return; _refreshing=true; location.reload(); });
+  window.addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('sw.js');
+      const showUpd=()=>{ const el=document.getElementById('updbar'); if(!el)return; el.style.display='block';
+        el.onclick=()=>{ if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); else location.reload(); }; };
+      if(reg.waiting && navigator.serviceWorker.controller) showUpd();
+      reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(!nw)return;
+        nw.addEventListener('statechange',()=>{ if(nw.state==='installed' && navigator.serviceWorker.controller) showUpd(); }); });
+    }catch(e){}
+  });
+}
+// フローティング：トップ/結果へジャンプ＋スクロールで表示
+(function(){
+  const fabs=document.getElementById('fabs'); if(!fabs)return;
+  const top=document.getElementById('fab-top');
+  window.addEventListener('scroll',()=>{ if(window.scrollY>400) top.classList.add('show'); else top.classList.remove('show'); },{passive:true});
+  top.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+})();
 </script>
 </body>
 </html>
