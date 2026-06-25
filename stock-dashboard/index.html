@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v23<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v24<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -382,6 +382,16 @@ a{color:var(--ac)}
       <div class="headline" id="headline"><span class="ico" id="hl-ico">—</span><span class="txt" id="hl-txt">—</span></div>
       <div class="advice" id="advice"></div>
       <div class="scorebadge"><span class="lbl">総合スコア</span><span class="num" id="score-num">—</span><div class="track"><div class="fill" id="score-fill" style="width:0%"></div></div></div>
+      <details style="margin-top:6px">
+        <summary>スコアの内訳・配分</summary>
+        <div id="score-break" class="tiny" style="margin-top:8px"></div>
+        <div class="row" style="margin-top:8px">
+          <div class="field"><label class="lbl">RS %</label><input id="sw-rs" class="t" style="width:64px" value="35" inputmode="numeric"/></div>
+          <div class="field"><label class="lbl">8条件 %</label><input id="sw-tt" class="t" style="width:64px" value="25" inputmode="numeric"/></div>
+          <div class="field"><label class="lbl">セットアップ %</label><input id="sw-setup" class="t" style="width:80px" value="40" inputmode="numeric"/></div>
+        </div>
+        <div class="tiny muted" style="margin-top:4px">配分は自動で正規化（合計100でなくてもOK）。地合い弱なら×0.85、新高値接近で+3。</div>
+      </details>
       <div class="verdicts" id="verdicts" style="margin-top:12px">
         <div class="vchip" id="vc-trend"><div class="k">Trend</div><div class="v">—</div></div>
         <div class="vchip" id="vc-entry"><div class="k">Entry</div><div class="v">—</div></div>
@@ -519,8 +529,10 @@ const CONFIG = {
   stopBasis:'app',        // 損切り基準: app/swing/atr/ema21/pct
   stopATRmult:2,          // ATR基準の倍率
   stopPctVal:8,           // 固定%基準の値
+  scoreW:{rs:35, tt:25, setup:40}, // 総合スコアの配分(%)。合計≠100でも正規化
 };
 function applyStop(o){ Object.assign(CONFIG,o); }
+function applyScoreW(o){ CONFIG.scoreW=Object.assign({},CONFIG.scoreW,o); }
 // 買い候補フィルター（各ON/OFFで有効/無効。OFF=その条件で弾かない）
 const FILTERS = { market:true, pullback:true, breakout:true, rs:true, risk:true, liq:false, weekly:false };
 function applyFilters(o){ Object.assign(FILTERS,o); }
@@ -831,10 +843,20 @@ function judge(d){
     : action==='保有/待機'?55 : action==='利確検討'?35 : action==='様子見'?10 : 50;
   const rsScore = rs!=null? rs : 50;
   const ttScore = ttEval? (ttPass/ttEval)*100 : 50;
-  let score = Math.round(0.35*rsScore + 0.25*ttScore + 0.40*setupScore);
+  // 配分（CONFIG.scoreW）を正規化して使用
+  const W=CONFIG.scoreW, wsum=(W.rs+W.tt+W.setup)||1;
+  const wr=W.rs/wsum, wt=W.tt/wsum, ws=W.setup/wsum;
+  const base = wr*rsScore + wt*ttScore + ws*setupScore;
+  let score = Math.round(base);
   if(d.marketOK===false) score=Math.round(score*0.85);   // 地合い弱は減点
   if(nearBreakout) score=Math.min(100,score+3);          // 新高値接近は加点
   score=Math.max(0,Math.min(100,score));
+  const scoreParts={
+    rs:{val:rsScore, w:wr, contrib:wr*rsScore, manual:!!d.rsManual},
+    tt:{val:ttScore, w:wt, contrib:wt*ttScore, pass:ttPass, evalN:ttEval},
+    setup:{val:setupScore, w:ws, contrib:ws*setupScore, label:action},
+    marketPenalty: d.marketOK===false, breakoutBonus: nearBreakout?3:0
+  };
 
   // --- アドバイス文（自然文）---
   const advice=buildAdvice({action,trend,entry,tp,hot,gainFromMA,volX,rsi14,
@@ -844,7 +866,7 @@ function judge(d){
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
     trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK,
-    score,nearBreakout,weeklyUp,avgDollarVol,sell
+    score,scoreParts,nearBreakout,weeklyUp,avgDollarVol,sell
   };
 }
 
@@ -1087,6 +1109,19 @@ function render(sym,d,r){
   const sc=r.score!=null?r.score:0;
   document.getElementById('score-num').textContent=sc;
   document.getElementById('score-fill').style.width=sc+'%';
+  // スコア内訳
+  const sp=r.scoreParts, sb=document.getElementById('score-break');
+  if(sp){
+    const line=(name,val,w,contrib,extra)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--soft)"><span class="muted">${name}${extra||''}</span><span><b>${val}</b> ×${(w*100).toFixed(0)}% = <b style="color:var(--ac)">${contrib.toFixed(1)}</b></span></div>`;
+    let h='';
+    h+=line('RS', sp.rs.val, sp.rs.w, sp.rs.contrib, sp.rs.manual?'<span class="pill ok">IBD</span>':'');
+    h+=line('8条件達成率', sp.tt.val.toFixed(0)+`<span class="muted">(${sp.tt.pass}/${sp.tt.evalN})</span>`, sp.tt.w, sp.tt.contrib);
+    h+=line('セットアップ', sp.setup.val+`<span class="muted">(${sp.setup.label})</span>`, sp.setup.w, sp.setup.contrib);
+    if(sp.marketPenalty) h+=`<div style="padding:3px 0"><span class="warn">地合い弱 ×0.85</span></div>`;
+    if(sp.breakoutBonus) h+=`<div style="padding:3px 0"><span class="pos">🔥新高値接近 +${sp.breakoutBonus}</span></div>`;
+    h+=`<div style="display:flex;justify-content:space-between;padding:5px 0;font-weight:900"><span>総合スコア</span><span style="color:var(--ac)">${sc}</span></div>`;
+    sb.innerHTML=h;
+  }
 
   renderSell(r);
 
@@ -1644,6 +1679,9 @@ Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListen
 // 損切り基準
 function readStop(){ const o={stopBasis:document.getElementById('stopbasis').value, stopATRmult:parseFloat(document.getElementById('stopatr').value)||2, stopPctVal:parseFloat(document.getElementById('stoppct').value)||8}; applyStop(o); localStorage.setItem('stop',JSON.stringify(o)); }
 ['stopbasis','stopatr','stoppct'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ readStop(); reJudge(); reScreen(); }));
+// スコア配分
+function readScoreW(){ const o={rs:Math.max(0,parseFloat(document.getElementById('sw-rs').value)||0), tt:Math.max(0,parseFloat(document.getElementById('sw-tt').value)||0), setup:Math.max(0,parseFloat(document.getElementById('sw-setup').value)||0)}; if(o.rs+o.tt+o.setup<=0){o.rs=35;o.tt=25;o.setup=40;} applyScoreW(o); localStorage.setItem('scoreW',JSON.stringify(o)); }
+['sw-rs','sw-tt','sw-setup'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ readScoreW(); reJudge(); reScreen(); }));
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
   const k=th.dataset.k;
   if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
@@ -1675,6 +1713,9 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   // 損切り基準を復元
   try{ const ss=JSON.parse(localStorage.getItem('stop')||'null'); if(ss){ if(ss.stopBasis) document.getElementById('stopbasis').value=ss.stopBasis; if(ss.stopATRmult) document.getElementById('stopatr').value=ss.stopATRmult; if(ss.stopPctVal) document.getElementById('stoppct').value=ss.stopPctVal; } }catch(e){}
   readStop();
+  // スコア配分を復元
+  try{ const sw=JSON.parse(localStorage.getItem('scoreW')||'null'); if(sw){ if(sw.rs!=null)document.getElementById('sw-rs').value=sw.rs; if(sw.tt!=null)document.getElementById('sw-tt').value=sw.tt; if(sw.setup!=null)document.getElementById('sw-setup').value=sw.setup; } }catch(e){}
+  readScoreW();
   const bench=localStorage.getItem('bench'); if(bench) document.getElementById('bench').value=bench;
   // 文字サイズ復元
   const fs=localStorage.getItem('fontscale'); if(fs) document.documentElement.style.fontSize=fs;
