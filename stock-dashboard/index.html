@@ -6,6 +6,12 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="株価判断"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="icon-180.png"/>
 <title>株価判断ダッシュボード — TradingView連携 トレンドテンプレート</title>
 <style>
 :root{
@@ -18,6 +24,13 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,Bli
 .header{position:sticky;top:0;z-index:20;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .ht{font-weight:900;color:var(--ac);font-size:15px;line-height:1.2}
 .hs{font-size:11px;color:var(--muted);font-weight:800}
+.fbtn{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;font-weight:900;font-size:12px;min-width:32px;min-height:30px;cursor:pointer}
+.scorebadge{display:flex;align-items:center;gap:10px;margin:10px 0 2px}
+.scorebadge .lbl{font-size:12px;color:var(--muted);font-weight:800}
+.scorebadge .num{font-size:24px;font-weight:900;color:var(--ac)}
+.scorebadge .track{flex:1;height:10px;border-radius:999px;background:var(--soft);overflow:hidden}
+.scorebadge .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ac),var(--teal))}
+.bo{display:inline-block;background:rgba(56,189,248,.16);color:var(--ac);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:900;margin-left:6px}
 .wrap{max-width:920px;margin:0 auto;padding:16px 14px 60px}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .field{display:flex;flex-direction:column;gap:5px}
@@ -185,7 +198,11 @@ a{color:var(--ac)}
 <body>
 <div class="header">
   <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">TradingView連携 / トレンドテンプレート判定</div></div>
-  <div class="hs" style="text-align:right">v13<br><span id="build" style="font-weight:700"></span></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
+    <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
+    <div class="hs" style="text-align:right">v14<br><span id="build" style="font-weight:700"></span></div>
+  </div>
 </div>
 
 <div class="wrap">
@@ -216,6 +233,13 @@ a{color:var(--ac)}
           <option value="loose">緩い（乖離も許容）</option>
           <option value="normal" selected>標準</option>
           <option value="strict">厳しい（押し目のみ）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl">ベンチマーク(RS/地合い)</label>
+        <select id="bench" class="t" style="width:120px">
+          <option value="SPY" selected>SPY（米国全体）</option>
+          <option value="QQQ">QQQ（ハイテク）</option>
         </select>
       </div>
       <button id="run" class="btn">判定する</button>
@@ -249,6 +273,8 @@ a{color:var(--ac)}
       <label><input type="checkbox" id="f-breakout" checked> ブレイクは52週高値圏のみ<span class="sub">／高値−8%以内のブレイクだけ買い候補</span></label>
       <label><input type="checkbox" id="f-rs" checked> RS≥70 必須<span class="sub">／相対的に弱い銘柄は買い候補にしない</span></label>
       <label><input type="checkbox" id="f-risk" checked> 損切り幅が大きい銘柄を除外<span class="sub">／現値→損切りが10%超は見送り</span></label>
+      <label><input type="checkbox" id="f-liq"> 流動性フィルター<span class="sub">／平均売買代金が小さい銘柄(約300万ドル未満)を除外</span></label>
+      <label><input type="checkbox" id="f-weekly"> 週足も上昇のみ<span class="sub">／30週線(≒150日)の上＋上向き(ステージ2)だけ買い候補</span></label>
     </div>
     <div class="tiny muted" style="margin-top:8px">変更すると、表示中の判定とスクリーニング表の両方がすぐ再評価されます（再取得なし）。</div>
   </div>
@@ -260,11 +286,12 @@ a{color:var(--ac)}
     <textarea id="wl" class="t" style="margin-top:8px" placeholder="例: NBIS, RKLB, NVDA, AAPL, PLTR（カンマ/改行/スペース区切り・最大30）">NVDA NBIS GEV LITE MU SNDK STX AAOI ASX MRVL AMAT TSEM VICR PLTR OKLO TSLA SPCX SIMO MXL MKSI FLEX NET SKM BE RKLB PL CRWV</textarea>
     <div class="row" style="margin-top:8px">
       <button id="screen" class="btn">スクリーニング</button>
+      <button id="csv" class="btn alt" style="display:none">CSV出力</button>
       <span class="tiny muted" id="scr-status"></span>
     </div>
     <div class="scrwrap"><table class="scrn" id="scrn" style="display:none">
       <thead><tr>
-        <th data-k="sym">銘柄</th><th data-k="action">行動</th><th data-k="ttPass">条件</th>
+        <th data-k="score">★</th><th data-k="sym">銘柄</th><th data-k="action">行動</th><th data-k="ttPass">条件</th>
         <th data-k="rs">RS</th><th data-k="gain">21EMA乖離</th><th data-k="close">終値</th>
       </tr></thead>
       <tbody id="scrn-body"></tbody>
@@ -278,6 +305,7 @@ a{color:var(--ac)}
       <h2>② 総合判定 <span id="symlabel" class="tag"></span></h2>
       <div class="headline" id="headline"><span class="ico" id="hl-ico">—</span><span class="txt" id="hl-txt">—</span></div>
       <div class="advice" id="advice"></div>
+      <div class="scorebadge"><span class="lbl">総合スコア</span><span class="num" id="score-num">—</span><div class="track"><div class="fill" id="score-fill" style="width:0%"></div></div></div>
       <div class="verdicts" id="verdicts" style="margin-top:12px">
         <div class="vchip" id="vc-trend"><div class="k">Trend</div><div class="v">—</div></div>
         <div class="vchip" id="vc-entry"><div class="k">Entry</div><div class="v">—</div></div>
@@ -373,9 +401,10 @@ const CONFIG = {
   volSurge:1.5,           // 出来高倍率がこの値超で「出来高あり」
   rsGood:70,              // RS Rating近似がこの値以上で良好
   maxRiskPct:10,          // 損切り幅(現値→損切り)がこの%超なら買い候補から除外
+  minDollarVol:3e6,       // 平均売買代金(出来高×株価)がこの値未満なら除外
 };
 // 買い候補フィルター（各ON/OFFで有効/無効。OFF=その条件で弾かない）
-const FILTERS = { market:true, pullback:true, breakout:true, rs:true, risk:true };
+const FILTERS = { market:true, pullback:true, breakout:true, rs:true, risk:true, liq:false, weekly:false };
 function applyFilters(o){ Object.assign(FILTERS,o); }
 // 相場環境：SPYが上昇トレンド(50/200日線の上＆200日線上向き)か
 function marketRegime(spyCloses){
@@ -515,6 +544,14 @@ function judge(d){
   const sma200arr=sma(d.close,CONFIG.sma3);
   const sma200prev=sma200arr[n-21];           // 約1ヶ月前の200SMA(向き判定)
   const sma200up=(sma200!=null&&sma200prev!=null)? sma200>sma200prev : null;
+  // 週足トレンド近似：30週(≒150日)線の上＆上向き（Weinsteinステージ2）
+  const sma150arr=sma(d.close,CONFIG.sma2);
+  const sma150prev=sma150arr[n-21];
+  const weeklyUp=(sma150!=null&&sma150prev!=null)? (close>sma150 && sma150>sma150prev) : null;
+  // 流動性：平均売買代金（出来高×株価）
+  const avgDollarVol=(volAvg!=null)? volAvg*close : null;
+  // 新高値接近
+  const nearBreakout = from52high>=-3 && (gainFromMA==null||gainFromMA<CONFIG.gainFromMA_hot);
 
   // 半値返し: 直近の高値→安値の下落に対する戻り率
   let half=null;
@@ -585,6 +622,8 @@ function judge(d){
     if(F.breakout && entryKind==='ブレイク' && !nearHigh) blocks.push('52週高値圏でない');
     if(F.rs && rs!=null && rs<70) blocks.push('RS<70');
     if(F.risk && isFinite(riskPct) && riskPct>CONFIG.maxRiskPct) blocks.push(`損切り幅大(${riskPct.toFixed(0)}%)`);
+    if(F.liq && avgDollarVol!=null && avgDollarVol<CONFIG.minDollarVol) blocks.push('流動性が低い');
+    if(F.weekly && weeklyUp===false) blocks.push('週足が上昇でない');
     if(blocks.length) entry='待機'; // フィルターで弾かれたら見送り
   }
   reasons.push(`押し目圏(≤${CONFIG.pullbackMax}%): ${nearMA?'○':'×'} / 出来高 ${volX!=null?volX.toFixed(2)+'x':'—'}（閾値${CONFIG.volSurge}x）`);
@@ -628,14 +667,25 @@ function judge(d){
   const ttPass=tt.filter(c=>c.pass===true).length;
   const ttEval=tt.filter(c=>c.pass!==null).length;
 
+  // --- 総合スコア(0-100): "今買うなら"の優先度。RS・条件達成・セットアップ・地合いを合成 ---
+  const setupScore = action.indexOf('買い候補')===0?100
+    : action==='保有/待機'?55 : action==='利確検討'?35 : action==='様子見'?10 : 50;
+  const rsScore = rs!=null? rs : 50;
+  const ttScore = ttEval? (ttPass/ttEval)*100 : 50;
+  let score = Math.round(0.35*rsScore + 0.25*ttScore + 0.40*setupScore);
+  if(d.marketOK===false) score=Math.round(score*0.85);   // 地合い弱は減点
+  if(nearBreakout) score=Math.min(100,score+3);          // 新高値接近は加点
+  score=Math.max(0,Math.min(100,score));
+
   // --- アドバイス文（自然文）---
   const advice=buildAdvice({action,trend,entry,tp,hot,gainFromMA,volX,rsi14,
-    ttPass,ttEval,tt,from52high,stacked,emaUp,blocks});
+    ttPass,ttEval,tt,from52high,stacked,emaUp,blocks,nearBreakout});
 
   return {
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
-    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK
+    trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK,
+    score,nearBreakout,weeklyUp,avgDollarVol
   };
 }
 
@@ -846,8 +896,12 @@ function render(sym,d,r){
   // headline + advice
   const hl=document.getElementById('headline'); hl.className='headline '+r.advice.cls;
   document.getElementById('hl-ico').textContent=r.advice.ico;
-  document.getElementById('hl-txt').textContent=r.advice.head;
+  document.getElementById('hl-txt').innerHTML=r.advice.head + (r.nearBreakout?'<span class="bo">🔥新高値接近</span>':'');
   document.getElementById('advice').innerHTML=r.advice.html;
+  // 総合スコア
+  const sc=r.score!=null?r.score:0;
+  document.getElementById('score-num').textContent=sc;
+  document.getElementById('score-fill').style.width=sc+'%';
 
   setVerdict('vc-trend',r.trend);
   setVerdict('vc-entry',r.entry);
@@ -1025,11 +1079,13 @@ async function fetchSeries(sym, source, onWait){
 // SPYベンチマークを10分キャッシュ（RS計算用・API節約）
 let _spyCache={data:null,ts:0,source:''};
 let lastData=null, lastSym=null;   // 直近判定データ（フィルター変更時の再評価用）
+function benchSym(){ const el=document.getElementById('bench'); return el? el.value : 'SPY'; }
 async function getBenchmark(source){
   if(source==='csv') return null;
-  if(_spyCache.data && _spyCache.source===source && Date.now()-_spyCache.ts<6e5) return _spyCache.data;
-  const spy=await fetchSeries('SPY',source);
-  _spyCache={data:spy,ts:Date.now(),source}; return spy;
+  const bs=benchSym();
+  if(_spyCache.data && _spyCache.source===source && _spyCache.bench===bs && Date.now()-_spyCache.ts<6e5) return _spyCache.data;
+  const spy=await fetchSeries(bs,source);
+  _spyCache={data:spy,ts:Date.now(),source,bench:bs}; return spy;
 }
 
 async function run(){
@@ -1124,7 +1180,7 @@ function renderRecent(){
 
 /* ===== スクリーニング ===== */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let scrnRows=[], scrnSort={k:'ttPass',dir:-1};
+let scrnRows=[], scrnSort={k:'score',dir:-1};
 async function screen(){
   const source=document.getElementById('source').value;
   if(source==='csv'){ document.getElementById('scr-status').textContent='CSVはスクリーニング非対応。Twelve Data/Stooqを選んでください。'; return; }
@@ -1152,7 +1208,7 @@ async function screen(){
       d.rs= spy? rsRatingApprox(d.close,spy.close):null;
       d.marketOK= spy? marketRegime(spy.close):null;
       const r=judge(d);
-      scrnRows.push({sym,ok:true,d,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
+      scrnRows.push({sym,ok:true,d,score:r.score,nearBreakout:r.nearBreakout,action:r.action,ttPass:r.ttPass,ttEval:r.ttEval,rs:r.rs,gain:r.gainFromMA,close:r.close,trend:r.trend});
     }
     renderScreen();
     if(i<syms.length-1) await sleep(source==='twelvedata'?150:400);
@@ -1160,6 +1216,8 @@ async function screen(){
   const okN=scrnRows.filter(r=>r.ok).length;
   st.textContent=`完了：${okN}/${syms.length} 件取得` + (okN<syms.length?'（失敗は銘柄表記/未対応銘柄の可能性。少し待って再実行を）':'');
   btn.disabled=false; btn.textContent='スクリーニング';
+  document.getElementById('csv').style.display= okN? 'inline-flex':'none';
+  saveScreen();
 }
 function actClass(a){ return a.indexOf('買い候補')===0?'buy':a==='利確検討'?'tp':a==='様子見'?'wait':'hold'; }
 function renderScreen(){
@@ -1174,9 +1232,12 @@ function renderScreen(){
   tb.innerHTML='';
   rows.forEach(r=>{
     const tr=document.createElement('tr');
-    if(!r.ok){ tr.className='bad'; tr.innerHTML=`<td class="sym">${r.sym}</td><td colspan="5" style="text-align:left">取得失敗: ${r.err}</td>`; tb.appendChild(tr); return; }
+    if(!r.ok){ tr.className='bad'; tr.innerHTML=`<td colspan="2" class="sym">${r.sym}</td><td colspan="5" style="text-align:left">取得失敗: ${r.err}</td>`; tb.appendChild(tr); return; }
+    const sc=r.score!=null?r.score:0;
+    const scCls=sc>=80?'pos':sc>=60?'':'warn';
     tr.innerHTML=
-      `<td class="sym"><a href="#" data-sym="${r.sym}" class="jump">${r.sym}</a></td>`+
+      `<td class="b ${scCls}">${sc}</td>`+
+      `<td class="sym">${r.nearBreakout?'🔥':''}<a href="#" data-sym="${r.sym}" class="jump">${r.sym}</a></td>`+
       `<td><span class="act ${actClass(r.action)}">${r.action}</span></td>`+
       `<td class="b">${r.ttPass}/${r.ttEval}</td>`+
       `<td class="b ${r.rs>=70?'pos':(r.rs!=null?'warn':'')}">${r.rs!=null?r.rs:'—'}</td>`+
@@ -1192,8 +1253,20 @@ function renderScreen(){
 function reScreen(){
   if(!scrnRows.length) return;
   scrnRows.forEach(row=>{ if(row.ok && row.d){ const r=judge(row.d);
-    row.action=r.action; row.ttPass=r.ttPass; row.ttEval=r.ttEval; row.rs=r.rs; row.gain=r.gainFromMA; } });
-  renderScreen();
+    row.action=r.action; row.ttPass=r.ttPass; row.ttEval=r.ttEval; row.rs=r.rs; row.gain=r.gainFromMA; row.score=r.score; row.nearBreakout=r.nearBreakout; } });
+  renderScreen(); saveScreen();
+}
+// スクリーニング結果を保存/復元（軽量・dは除く）
+function saveScreen(){
+  try{ const lite=scrnRows.map(({d,...r})=>r); localStorage.setItem('scrn',JSON.stringify(lite)); }catch(e){}
+}
+function exportCSV(){
+  if(!scrnRows.length) return;
+  const head=['score','sym','action','ttPass','ttEval','rs','gainFromMA_pct','close','nearBreakout'];
+  const rows=scrnRows.filter(r=>r.ok).map(r=>[r.score,r.sym,r.action,r.ttPass,r.ttEval,r.rs,(r.gain!=null?r.gain.toFixed(2):''),r.close,r.nearBreakout?'1':'']);
+  const csv=[head.join(',')].concat(rows.map(a=>a.join(','))).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='screening.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
 /* UI wiring */
@@ -1207,9 +1280,11 @@ document.getElementById('symbol').addEventListener('keydown',e=>{ if(e.key==='En
 document.getElementById('acct').addEventListener('input',updateShares);
 document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('screen').addEventListener('click',screen);
+document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('preset').addEventListener('change',e=>{ applyPreset(e.target.value); localStorage.setItem('preset',e.target.value); reJudge(); reScreen(); });
+document.getElementById('bench').addEventListener('change',e=>{ localStorage.setItem('bench',e.target.value); _spyCache={data:null,ts:0,source:''}; });
 // 買い候補フィルターのチェックボックス
-const FILTER_IDS={market:'f-market',pullback:'f-pullback',breakout:'f-breakout',rs:'f-rs',risk:'f-risk'};
+const FILTER_IDS={market:'f-market',pullback:'f-pullback',breakout:'f-breakout',rs:'f-rs',risk:'f-risk',liq:'f-liq',weekly:'f-weekly'};
 function readFilters(){ const o={}; for(const k in FILTER_IDS) o[k]=document.getElementById(FILTER_IDS[k]).checked; applyFilters(o); localStorage.setItem('filters',JSON.stringify(o)); }
 Object.values(FILTER_IDS).forEach(id=>document.getElementById(id).addEventListener('change',()=>{ readFilters(); reJudge(); reScreen(); }));
 document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
@@ -1240,8 +1315,21 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   // フィルター状態を復元
   try{ const sf=JSON.parse(localStorage.getItem('filters')||'null'); if(sf){ for(const k in FILTER_IDS){ if(typeof sf[k]==='boolean') document.getElementById(FILTER_IDS[k]).checked=sf[k]; } } }catch(e){}
   readFilters();
+  const bench=localStorage.getItem('bench'); if(bench) document.getElementById('bench').value=bench;
+  // 文字サイズ復元
+  const fs=localStorage.getItem('fontscale'); if(fs) document.documentElement.style.fontSize=fs;
+  // 前回のスクリーニング結果を復元（再判定には再実行が必要）
+  try{ const sv=JSON.parse(localStorage.getItem('scrn')||'null'); if(sv&&sv.length){ scrnRows=sv; renderScreen(); document.getElementById('csv').style.display='inline-flex'; document.getElementById('scr-status').textContent='前回の結果を表示中（フィルター反映には再スクリーニング）。'; } }catch(e){}
   renderRecent();
 })();
+// 文字サイズ調整
+function setFont(delta){
+  const cur=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
+  const nv=Math.max(13,Math.min(20,cur+delta))+'px';
+  document.documentElement.style.fontSize=nv; localStorage.setItem('fontscale',nv);
+}
+// PWA: Service Worker登録（オフライン/ホーム画面アプリ化）
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
 </script>
 </body>
 </html>
