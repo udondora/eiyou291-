@@ -216,7 +216,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v21<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v22<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -253,8 +253,9 @@ a{color:var(--ac)}
       </div>
       <div class="field">
         <label class="lbl">ベンチマーク(RS/地合い)</label>
-        <select id="bench" class="t" style="width:120px">
-          <option value="SPY" selected>SPY（米国全体）</option>
+        <select id="bench" class="t" style="width:150px">
+          <option value="RSP" selected>RSP（均等加重・IBD近似）</option>
+          <option value="SPY">SPY（米国全体）</option>
           <option value="QQQ">QQQ（ハイテク）</option>
         </select>
       </div>
