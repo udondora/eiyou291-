@@ -168,6 +168,11 @@ a{color:var(--ac)}
 .lvbox .k{font-size:11px;color:var(--muted);font-weight:800}
 .lvbox .v{font-size:18px;font-weight:900;margin-top:2px}
 .lvbox .d{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35}
+.bkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bkpill{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 6px;text-align:center}
+.bkpill .bn{font-size:22px;font-weight:900;line-height:1}
+.bkpill .bl{font-size:10px;color:var(--muted);font-weight:800;margin-top:4px;line-height:1.3}
+.bkpill.pos .bn{color:var(--ok)} .bkpill.neg .bn{color:var(--ng)}
 .segbtns{display:inline-flex;gap:4px}
 .segbtns button{background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:12px;padding:6px 10px;min-height:34px;cursor:pointer}
 .segbtns button.on{background:var(--ac);color:#00110e;border-color:var(--ac)}
@@ -236,6 +241,7 @@ a{color:var(--ac)}
   .lvbox .v{font-size:16px}
   .scrn{font-size:12px}
   .scrn th,.scrn td{padding:6px 6px}
+  .bkgrid{grid-template-columns:repeat(2,1fr)}
 }
 @media (max-width:360px){
   .vchip .v{font-size:13px}
@@ -250,7 +256,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v35<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v36<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -366,6 +372,16 @@ a{color:var(--ac)}
           <button data-b="5">1週</button><button data-b="21" class="on">1ヶ月</button><button data-b="63">3ヶ月</button>
         </div>
         <span class="tiny muted" id="th-status"></span>
+      </div>
+      <div id="th-breakout" style="display:none;margin-top:12px">
+        <div class="tiny muted" style="margin-bottom:6px"><b>📈 ブレイク・サマリー（取得済み全銘柄の勢い）</b></div>
+        <div class="row" style="align-items:center;gap:8px;margin-bottom:8px">
+          <span class="tiny muted">MAブレイク:</span>
+          <div class="segbtns" id="th-ma"><button data-m="20" class="on">20日</button><button data-m="50">50日</button><button data-m="200">200日</button></div>
+          <div class="segbtns" id="th-dir"><button data-d="up" class="on">上抜け</button><button data-d="down">下抜け</button></div>
+        </div>
+        <div class="bkgrid" id="th-bkgrid"></div>
+        <div class="tiny muted" id="th-bknote" style="margin-top:6px"></div>
       </div>
       <div id="th-body" style="margin-top:10px"><div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div></div>
     </details>
@@ -1779,8 +1795,45 @@ async function runThemes(){
   btn.disabled=false; btn.textContent='📊 テーマ分析';
   renderThemes();
 }
+// --- ブレイク・サマリー（取得済み全銘柄の市場の勢い） ---
+let breakMA=20, breakDir='up';
+function smaAt(c,len,idx){ if(idx<len-1) return null; let s=0; for(let i=idx-len+1;i<=idx;i++) s+=c[i]; return s/len; }
+function newHigh(d){ const h=d.high,c=d.close,n=c.length-1,j=Math.max(0,n-251); let hi=-Infinity; for(let i=j;i<n;i++) hi=Math.max(hi,h[i]); return hi>0 && c[n]>=hi; }
+function newLow(d){ const l=d.low,c=d.close,n=c.length-1,j=Math.max(0,n-251); let lo=Infinity; for(let i=j;i<n;i++) lo=Math.min(lo,l[i]); return isFinite(lo) && c[n]<=lo; }
+function volSurge(d){ const v=d.volume,n=v.length-1; if(n<21) return false; let s=0; for(let i=n-20;i<n;i++) s+=v[i]; const avg=s/20; return avg>0 && v[n]>=avg*1.5; }
+function crossedMA(d,len,dir,lookback=5){
+  const c=d.close,n=c.length-1; if(n<len) return false;
+  const maNow=smaAt(c,len,n); if(maNow==null) return false;
+  const aboveNow=c[n]>maNow;
+  if(dir==='up'&&!aboveNow) return false;
+  if(dir==='down'&&aboveNow) return false;
+  for(let k=1;k<=lookback;k++){ const j=n-k; if(j<len-1) break; const ma=smaAt(c,len,j); if(ma==null) continue;
+    const above=c[j]>ma;
+    if(dir==='up'&&!above) return true;   // 下→上へクロス
+    if(dir==='down'&&above) return true;  // 上→下へクロス
+  }
+  return false;
+}
+function renderBreakout(){
+  const all=Object.keys(themeData).map(s=>themeData[s]).filter(d=>d&&!d.err);
+  const wrap=document.getElementById('th-breakout');
+  if(!all.length){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  const tot=all.length;
+  const nh=all.filter(newHigh).length, nl=all.filter(newLow).length;
+  const cross=all.filter(d=>crossedMA(d,breakMA,breakDir)).length;
+  const vs=all.filter(volSurge).length;
+  const dirLab=breakDir==='up'?'上抜け':'下抜け';
+  document.getElementById('th-bkgrid').innerHTML=
+    `<div class="bkpill pos"><div class="bn">${nh}</div><div class="bl">52週高値 更新</div></div>`+
+    `<div class="bkpill neg"><div class="bn">${nl}</div><div class="bl">52週安値 更新</div></div>`+
+    `<div class="bkpill"><div class="bn">${cross}</div><div class="bl">MA${breakMA} ${dirLab}</div></div>`+
+    `<div class="bkpill"><div class="bn">${vs}</div><div class="bl">出来高急増(1.5x)</div></div>`;
+  document.getElementById('th-bknote').textContent=`対象 ${tot}銘柄（テーマ・トラッカーで取得済み）。${dirLab}＝直近5営業日内に価格がMA${breakMA}を${breakDir==='up'?'下から上へ':'上から下へ'}クロス。`;
+}
 function renderThemes(){
   const box=document.getElementById('th-body');
+  renderBreakout();
   const anyData=Object.keys(themeData).some(s=>themeData[s]&&!themeData[s].err);
   if(!anyData){ box.innerHTML='<div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div>'; return; }
   __themeRows=THEMES.map(t=>{
@@ -2116,6 +2169,10 @@ document.getElementById('pf-refresh').addEventListener('click',refreshPortfolio)
 document.getElementById('th-run').addEventListener('click',runThemes);
 document.getElementById('th-period').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
   themePeriod=+b.dataset.b; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderThemes(); });
+document.getElementById('th-ma').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  breakMA=+b.dataset.m; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderBreakout(); });
+document.getElementById('th-dir').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  breakDir=b.dataset.d; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderBreakout(); });
 ['pf-sym','pf-buy','pf-sh'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') addHolding(); }));
 document.getElementById('bt-run').addEventListener('click',backtest);
 document.getElementById('bt-wl').addEventListener('click',backtestWatchlist);
