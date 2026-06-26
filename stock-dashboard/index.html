@@ -41,6 +41,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,Bli
 .wrap>*{order:5} /* 既定の並び。order小さいほど上 */
 #inputcard{order:1}         /* 入力 */
 #screencard{order:2}        /* ウォッチリスト・スクリーニング */
+#themecard{order:2}         /* テーマ・トラッカー */
 #portcard{order:3}          /* 保有管理（ポートフォリオ） */
 #result{order:3}            /* トレンド/買い→売り判断 */
 .card.tools{order:5}        /* フィルター・バックテスト等のツール */
@@ -167,6 +168,18 @@ a{color:var(--ac)}
 .lvbox .k{font-size:11px;color:var(--muted);font-weight:800}
 .lvbox .v{font-size:18px;font-weight:900;margin-top:2px}
 .lvbox .d{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35}
+.segbtns{display:inline-flex;gap:4px}
+.segbtns button{background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:12px;padding:6px 10px;min-height:34px;cursor:pointer}
+.segbtns button.on{background:var(--ac);color:#00110e;border-color:var(--ac)}
+.throw{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--soft);cursor:pointer}
+.thrank{font-weight:900;color:var(--muted);width:18px;text-align:center;flex:none}
+.thmain{flex:1;min-width:0}
+.thname{font-weight:900;font-size:13.5px}
+.thspark{width:80px;flex:none;line-height:0}
+.thchg{width:62px;text-align:right;font-size:14px;font-weight:900;flex:none}
+.thdetail{padding:2px 4px 10px 32px}
+.thpill{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--soft);font-size:12.5px;font-weight:700}
+.thpill a{color:var(--ac);font-weight:900;text-decoration:none}
 .gloss{margin:10px 0 0}
 .gloss dt{font-weight:900;font-size:13px;color:var(--ac);margin-top:10px}
 .gloss dd{margin:2px 0 0;font-size:12.5px;font-weight:600;line-height:1.5;color:var(--tx)}
@@ -237,7 +250,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v34<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v35<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -340,6 +353,22 @@ a{color:var(--ac)}
       </tr></thead>
       <tbody id="scrn-body"></tbody>
     </table></div>
+  </div>
+
+  <!-- テーマ・トラッカー -->
+  <div class="card" id="themecard">
+    <details id="themebox">
+      <summary class="fsum">🗺 テーマ・トラッカー <span class="tiny muted">（セクター/テーマの強さランキング）</span></summary>
+      <div class="tiny muted" style="margin-top:6px">主要テーマの構成銘柄をまとめて取得し、<b>平均騰落率でランク付け</b>。テーマ内で<b>20日線の上にある銘柄数</b>・<b>新高値接近🔥数</b>とミニ推移も表示。「リーダー銘柄はリーダーテーマから」が王道です。テーマ行をタップで構成銘柄を表示（取得元は上の設定。Twelve Data推奨／初回は数分かかる場合あり）。</div>
+      <div class="row" style="margin-top:8px">
+        <button id="th-run" class="btn">📊 テーマ分析</button>
+        <div class="segbtns" id="th-period">
+          <button data-b="5">1週</button><button data-b="21" class="on">1ヶ月</button><button data-b="63">3ヶ月</button>
+        </div>
+        <span class="tiny muted" id="th-status"></span>
+      </div>
+      <div id="th-body" style="margin-top:10px"><div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div></div>
+    </details>
   </div>
 
   <!-- 保有管理（ポートフォリオ） -->
@@ -1696,6 +1725,102 @@ async function refreshPortfolio(){
   btn.disabled=false; btn.textContent='📊 一括更新';
 }
 
+/* ===== テーマ・トラッカー ===== */
+const THEMES=[
+  {name:'AI半導体', syms:['NVDA','AMD','AVGO','MRVL','TSM']},
+  {name:'半導体製造装置', syms:['AMAT','LRCX','KLAC','ASML']},
+  {name:'データストレージ', syms:['STX','WDC','SNDK','NTAP']},
+  {name:'AIインフラ/クラウド', syms:['NBIS','CRWV','NET','PLTR','VRT']},
+  {name:'原子力/電力', syms:['OKLO','SMR','CEG','VST','GEV']},
+  {name:'宇宙/防衛', syms:['RKLB','ASTS','LMT','KTOS']},
+  {name:'光通信/ネットワーク', syms:['AAOI','COHR','LITE','CIEN']},
+];
+let themeData={};     // sym -> 取得した series d（または {err}）
+let themePeriod=21;   // 騰落率の計算バー数
+let __themeRows=[];
+function themeUniq(){ return [...new Set(THEMES.flatMap(t=>t.syms))]; }
+function chgOf(d,bars){ const c=d.close,n=c.length-1,j=Math.max(0,n-bars); return j<n?(c[n]/c[j]-1)*100:null; }
+function aboveMA20(d){ const c=d.close,n=c.length-1; if(n<19) return false; let s=0; for(let i=n-19;i<=n;i++) s+=c[i]; return c[n]>s/20; }
+function near52h(d){ const h=d.high,c=d.close,n=c.length-1,j=Math.max(0,n-251); let hi=-Infinity; for(let i=j;i<=n;i++) hi=Math.max(hi,h[i]); return hi>0 && (c[n]/hi-1)*100>=-3; }
+function themeSpark(ds,L){
+  const arrs=ds.map(d=>{ const c=d.close,n=c.length-1,len=Math.min(L,n+1); const seg=c.slice(n-len+1,n+1); const base=seg[0]; return base>0?seg.map(x=>x/base*100):null; }).filter(a=>a&&a.length>=2);
+  if(!arrs.length) return '';
+  const minLen=Math.min(...arrs.map(a=>a.length));
+  const avg=[]; for(let k=0;k<minLen;k++){ let s=0; for(const a of arrs) s+=a[a.length-minLen+k]; avg.push(s/arrs.length); }
+  const W=80,H=24,mn=Math.min(...avg),mx=Math.max(...avg),rng=(mx-mn)||1;
+  const pts=avg.map((v,i)=>`${(i/(avg.length-1)*W).toFixed(1)},${(H-(v-mn)/rng*H).toFixed(1)}`).join(' ');
+  const col=avg[avg.length-1]>=avg[0]?'#22c55e':'#ef4444';
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"/></svg>`;
+}
+async function runThemes(){
+  const source=document.getElementById('source').value;
+  const st=document.getElementById('th-status');
+  if(source==='csv'){ st.textContent='CSVはテーマ分析に非対応。Twelve Data/Stooqを選んでください。'; return; }
+  const syms=themeUniq();
+  const btn=document.getElementById('th-run'); btn.disabled=true; btn.textContent='分析中…';
+  const onWait=sec=>{ st.textContent=`レート制限調整中… ${sec}秒待機（無料枠8回/分）`; };
+  for(let i=0;i<syms.length;i++){
+    const sym=syms[i];
+    if(themeData[sym]&&!themeData[sym].err){ continue; } // 取得済みは再利用
+    st.textContent=`取得中 ${i+1}/${syms.length}: ${sym}`;
+    let d=null;
+    for(let attempt=0;attempt<2 && !d;attempt++){
+      try{ d=await fetchSeries(sym,source,onWait); }
+      catch(e){ const msg=e.message||'失敗';
+        if(attempt===0 && /limit|429|credit|多すぎ|too many/i.test(msg)){ onWait(60); await sleep(60000); continue; }
+        themeData[sym]={err:msg}; break; }
+    }
+    if(d) themeData[sym]=d;
+    renderThemes();
+    if(i<syms.length-1) await sleep(source==='twelvedata'?150:400);
+  }
+  const okN=syms.filter(s=>themeData[s]&&!themeData[s].err).length;
+  st.textContent=`完了：${okN}/${syms.length} 銘柄`;
+  btn.disabled=false; btn.textContent='📊 テーマ分析';
+  renderThemes();
+}
+function renderThemes(){
+  const box=document.getElementById('th-body');
+  const anyData=Object.keys(themeData).some(s=>themeData[s]&&!themeData[s].err);
+  if(!anyData){ box.innerHTML='<div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div>'; return; }
+  __themeRows=THEMES.map(t=>{
+    const ds=t.syms.map(s=>themeData[s]).filter(d=>d&&!d.err);
+    const chgs=ds.map(d=>chgOf(d,themePeriod)).filter(x=>x!=null);
+    const avg=chgs.length? chgs.reduce((a,b)=>a+b,0)/chgs.length : null;
+    return {t, ds, n:ds.length, total:t.syms.length, avg,
+      aboveN:ds.filter(aboveMA20).length, hotN:ds.filter(near52h).length, spark:themeSpark(ds,60)};
+  }).sort((a,b)=>(b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg));
+  box.innerHTML=__themeRows.map((r,idx)=>{
+    const avgTxt=r.avg==null?'—':(r.avg>=0?'+':'')+r.avg.toFixed(1)+'%';
+    const avgCls=r.avg==null?'muted':r.avg>=0?'pos':'neg';
+    return `<div class="throw" data-i="${idx}">`+
+      `<div class="thrank">${idx+1}</div>`+
+      `<div class="thmain"><div class="thname">${r.t.name} <span class="tiny muted">${r.n}/${r.total}</span></div>`+
+      `<div class="thsub tiny muted">20日線上 ${r.aboveN}/${r.n}　🔥接近 ${r.hotN}</div></div>`+
+      `<div class="thspark">${r.spark||''}</div>`+
+      `<div class="thchg ${avgCls}">${avgTxt}</div></div>`+
+      `<div class="thdetail" id="thd-${idx}" style="display:none"></div>`;
+  }).join('');
+  box.querySelectorAll('.throw').forEach(el=>el.addEventListener('click',()=>toggleThemeDetail(+el.dataset.i)));
+}
+function toggleThemeDetail(idx){
+  const r=__themeRows[idx], el=document.getElementById('thd-'+idx); if(!r||!el) return;
+  if(el.style.display==='block'){ el.style.display='none'; return; }
+  const items=r.t.syms.map(s=>{ const d=themeData[s]; let chg=null,err=null,above=false,hot=false;
+    if(!d) err='未取得'; else if(d.err) err=d.err; else { chg=chgOf(d,themePeriod); above=aboveMA20(d); hot=near52h(d); }
+    return {s,chg,err,above,hot}; })
+    .sort((a,b)=>(b.chg==null?-1e9:b.chg)-(a.chg==null?-1e9:a.chg));
+  el.innerHTML=items.map(it=>{
+    const c=it.chg==null?'—':(it.chg>=0?'+':'')+it.chg.toFixed(1)+'%';
+    const cls=it.chg==null?'muted':it.chg>=0?'pos':'neg';
+    return `<div class="thpill"><span>${it.hot?'🔥':''}<a href="#" class="thjump" data-sym="${it.s}">${it.s}</a>`+
+      `${it.above?' <span class="tiny muted">20MA上</span>':''}${it.err?` <span class="tiny muted">(${it.err})</span>`:''}</span>`+
+      `<span class="${cls}">${c}</span></div>`;
+  }).join('');
+  el.style.display='block';
+  el.querySelectorAll('a.thjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
+}
+
 // フィルター/プリセット変更時、取得済みデータで表を再評価（再取得なし）
 function reScreen(){
   if(!scrnRows.length) return;
@@ -1988,6 +2113,9 @@ document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('pf-add').addEventListener('click',addHolding);
 document.getElementById('pf-refresh').addEventListener('click',refreshPortfolio);
+document.getElementById('th-run').addEventListener('click',runThemes);
+document.getElementById('th-period').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  themePeriod=+b.dataset.b; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderThemes(); });
 ['pf-sym','pf-buy','pf-sh'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') addHolding(); }));
 document.getElementById('bt-run').addEventListener('click',backtest);
 document.getElementById('bt-wl').addEventListener('click',backtestWatchlist);
