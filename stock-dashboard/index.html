@@ -165,6 +165,7 @@ a{color:var(--ac)}
 .lvbox{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}
 .lvbox .k{font-size:11px;color:var(--muted);font-weight:800}
 .lvbox .v{font-size:18px;font-weight:900;margin-top:2px}
+.lvbox .d{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35}
 .lvbox.stop{border-color:rgba(239,68,68,.35)} .lvbox.stop .v{color:var(--ng)}
 .lvbox.tgt{border-color:rgba(34,197,94,.35)} .lvbox.tgt .v{color:var(--ok)}
 .sizebar{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
@@ -232,7 +233,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v31<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v32<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -474,19 +475,19 @@ a{color:var(--ac)}
         <div class="field"><label class="lbl">固定%</label><input id="stoppct" class="t" style="width:70px" value="8" inputmode="decimal"/></div>
       </div>
       <div class="lv">
-        <div class="lvbox"><div class="k">現値</div><div class="v" id="lv-close">—</div></div>
-        <div class="lvbox"><div class="k">直近スイング安値(10日)</div><div class="v" id="lv-swing">—</div></div>
-        <div class="lvbox stop"><div class="k">損切り目安（採用）</div><div class="v" id="lv-stop">—</div></div>
-        <div class="lvbox"><div class="k">想定リスク（現値→損切り）</div><div class="v" id="lv-risk">—</div></div>
-        <div class="lvbox tgt"><div class="k">利確目標 2R</div><div class="v" id="lv-t2">—</div></div>
-        <div class="lvbox tgt"><div class="k">利確目標 3R</div><div class="v" id="lv-t3">—</div></div>
+        <div class="lvbox"><div class="k">現値</div><div class="v" id="lv-close">—</div><div class="d">今の株価</div></div>
+        <div class="lvbox"><div class="k">直近スイング安値(10日)</div><div class="v" id="lv-swing">—</div><div class="d">直近の押し安値。損切りをよく置く場所</div></div>
+        <div class="lvbox stop"><div class="k">① 損切りライン（撤退）</div><div class="v" id="lv-stop">—</div><div class="d">ここを割れたら売って撤退。負けを限定する線</div></div>
+        <div class="lvbox"><div class="k">② 1株あたりの負け額（=1R）</div><div class="v" id="lv-risk">—</div><div class="d">現値で買って損切りに当たると失う額。これが「1R」</div></div>
+        <div class="lvbox tgt"><div class="k">③ 利確目標 2R</div><div class="v" id="lv-t2">—</div><div class="d" id="lv-t2d">負け額の2倍の利益。まず半分利確の目安</div></div>
+        <div class="lvbox tgt"><div class="k">③ 利確目標 3R</div><div class="v" id="lv-t3">—</div><div class="d" id="lv-t3d">負け額の3倍の利益。残りの利確目安</div></div>
       </div>
       <div class="sizebar">
         <div class="field"><label class="lbl">口座資金</label><input id="acct" class="t" style="width:120px" inputmode="numeric" placeholder="例 1000000"/></div>
         <div class="field"><label class="lbl">1回のリスク%</label><input id="riskpct" class="t" style="width:90px" value="1" inputmode="decimal"/></div>
-        <div class="field"><label class="lbl">推奨株数 / 投入額</label><div class="metric" style="padding:9px 12px;min-width:160px"><div class="v" id="lv-shares" style="font-size:16px">—</div></div></div>
+        <div class="field"><label class="lbl">④ 推奨株数 / 投入額</label><div class="metric" style="padding:9px 12px;min-width:160px"><div class="v" id="lv-shares" style="font-size:16px">—</div></div></div>
       </div>
-      <div class="tiny muted" style="margin-top:8px">損切りは「スイング安値」と「現値−ATR×2」の高い方を採用（現値より下の場合）。利確は損切り幅(=1R)の2倍・3倍。あくまで機械的な目安です。</div>
+      <div class="tiny muted" style="margin-top:8px"><b>使い方:</b> ①ここを割れたら撤退する損切り価格 → ②そこまでの負け額が「1R」（リスクの単位） → ③利益目標は1Rの2倍・3倍で設定 → ④口座資金と「1回のリスク%」を入れると、負けても資金の◯%しか減らない株数を自動計算。<br>※損切りは「スイング安値」と「現値−ATR×2」の高い方を採用（現値より下の場合）。あくまで機械的な目安です。</div>
     </div>
 
     <div class="card">
@@ -1260,6 +1261,11 @@ function render(sym,d,r){
   document.getElementById('lv-risk').innerHTML=`${fmt(L.riskPerShare)} <span class="muted" style="font-size:12px">(${L.riskPct.toFixed(1)}%)</span>`;
   document.getElementById('lv-t2').textContent=fmt(L.target2R);
   document.getElementById('lv-t3').textContent=fmt(L.target3R);
+  if(r.close>0){
+    const g2=(L.target2R/r.close-1)*100, g3=(L.target3R/r.close-1)*100;
+    document.getElementById('lv-t2d').textContent=`現値から +${g2.toFixed(1)}%。まず半分利確の目安`;
+    document.getElementById('lv-t3d').textContent=`現値から +${g3.toFixed(1)}%。残りの利確目安`;
+  }
   updateShares();
 
   const ul=document.getElementById('reasons'); ul.innerHTML='';
