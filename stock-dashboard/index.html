@@ -41,6 +41,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,Bli
 .wrap>*{order:5} /* 既定の並び。order小さいほど上 */
 #inputcard{order:1}         /* 入力 */
 #screencard{order:2}        /* ウォッチリスト・スクリーニング */
+#portcard{order:3}          /* 保有管理（ポートフォリオ） */
 #result{order:3}            /* トレンド/買い→売り判断 */
 .card.tools{order:5}        /* フィルター・バックテスト等のツール */
 .card.summary{order:9}      /* 判定ロジック要約は最後 */
@@ -236,7 +237,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v33<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v34<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -339,6 +340,27 @@ a{color:var(--ac)}
       </tr></thead>
       <tbody id="scrn-body"></tbody>
     </table></div>
+  </div>
+
+  <!-- 保有管理（ポートフォリオ） -->
+  <div class="card" id="portcard">
+    <h2>💼 保有管理（ポートフォリオ）</h2>
+    <div class="tiny muted">保有銘柄と取得単価を登録すると、含み損益・損切りライン到達・売り/警戒判定をまとめて確認できます（取得元は上の設定。Twelve Data 推奨）。</div>
+    <div class="row" style="margin-top:8px">
+      <div class="field"><label class="lbl">銘柄</label><input id="pf-sym" class="t" style="width:90px" placeholder="NBIS"/></div>
+      <div class="field"><label class="lbl">取得単価</label><input id="pf-buy" class="t" style="width:90px" inputmode="decimal" placeholder="例 250.5"/></div>
+      <div class="field"><label class="lbl">株数(任意)</label><input id="pf-sh" class="t" style="width:80px" inputmode="numeric" placeholder="例 100"/></div>
+      <button id="pf-add" class="btn alt" style="align-self:flex-end;min-height:42px">＋追加</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="pf-refresh" class="btn">📊 一括更新</button>
+      <span class="tiny muted" id="pf-status"></span>
+    </div>
+    <div class="scrwrap"><table class="scrn" id="pf-table" style="display:none">
+      <thead><tr><th>銘柄</th><th>取得</th><th>現値</th><th>損益</th><th>判定</th><th>損切り</th><th></th></tr></thead>
+      <tbody id="pf-body"></tbody>
+    </table></div>
+    <div class="tiny muted" id="pf-empty" style="margin-top:8px">まだ登録がありません。上で銘柄と取得単価を入れて「＋追加」してください。</div>
   </div>
 
   <!-- バックテスト -->
@@ -1592,6 +1614,88 @@ function renderScreen(){
     e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run();
   }));
 }
+
+/* ===== 保有管理（ポートフォリオ） ===== */
+function getPortfolio(){ try{ return JSON.parse(localStorage.getItem('portfolio')||'[]'); }catch(e){ return []; } }
+function savePortfolio(p){ localStorage.setItem('portfolio',JSON.stringify(p)); }
+let pfLast={}; // sym -> {close,sellAction,stop,rs} or {err}
+function sellActClass(a){ return a.indexOf('売り')===0?'wait':a.indexOf('警戒')===0?'hold':a.indexOf('一部利確')===0?'tp':'buy'; }
+function addHolding(){
+  const sym=(document.getElementById('pf-sym').value||'').trim().toUpperCase();
+  const buy=parseFloat(document.getElementById('pf-buy').value);
+  const sh=parseFloat((document.getElementById('pf-sh').value||'').replace(/[, ]/g,''));
+  const st=document.getElementById('pf-status');
+  if(!sym){ st.textContent='銘柄を入力してください。'; return; }
+  const p=getPortfolio().filter(h=>h.sym!==sym);
+  p.push({sym, buy:isFinite(buy)?buy:null, shares:isFinite(sh)?sh:null});
+  savePortfolio(p);
+  document.getElementById('pf-sym').value=''; document.getElementById('pf-buy').value=''; document.getElementById('pf-sh').value='';
+  st.textContent=`${sym} を追加。「📊 一括更新」で評価します。`;
+  renderPortfolio();
+}
+function removeHolding(sym){ savePortfolio(getPortfolio().filter(h=>h.sym!==sym)); delete pfLast[sym]; renderPortfolio(); }
+function renderPortfolio(){
+  const p=getPortfolio();
+  const tbl=document.getElementById('pf-table'), body=document.getElementById('pf-body'), empty=document.getElementById('pf-empty');
+  if(!p.length){ tbl.style.display='none'; empty.style.display='block'; return; }
+  empty.style.display='none'; tbl.style.display='table'; body.innerHTML='';
+  p.forEach(h=>{
+    const ev=pfLast[h.sym]; const tr=document.createElement('tr'); const del=`<td><a href="#" class="pdel" data-sym="${h.sym}">✕</a></td>`;
+    if(!ev){
+      tr.innerHTML=`<td class="sym"><a href="#" data-sym="${h.sym}" class="pjump">${h.sym}</a></td>`+
+        `<td>${h.buy!=null?fmt(h.buy):'—'}</td><td>—</td><td>—</td><td><span class="tiny muted">未更新</span></td><td>—</td>`+del;
+    } else if(ev.err){
+      tr.className='bad';
+      tr.innerHTML=`<td class="sym"><a href="#" data-sym="${h.sym}" class="pjump">${h.sym}</a></td><td colspan="5" style="text-align:left">取得失敗: ${ev.err}</td>`+del;
+    } else {
+      const plPct = h.buy!=null? (ev.close/h.buy-1)*100 : null;
+      const plCls = plPct==null?'':plPct>=0?'pos':'neg';
+      const plAmt = (h.buy!=null && h.shares!=null)? (ev.close-h.buy)*h.shares : null;
+      const sa=ev.sellAction, stopHit = ev.stop!=null && ev.close<ev.stop;
+      tr.innerHTML=`<td class="sym"><a href="#" data-sym="${h.sym}" class="pjump">${h.sym}</a></td>`+
+        `<td>${h.buy!=null?fmt(h.buy):'—'}</td>`+
+        `<td>${fmt(ev.close)}</td>`+
+        `<td class="b ${plCls}">${plPct==null?'—':(plPct>=0?'+':'')+plPct.toFixed(1)+'%'}${plAmt!=null?`<br><span class="tiny muted">${plAmt>=0?'+':''}${fmt(plAmt,0)}</span>`:''}</td>`+
+        `<td><span class="act ${sellActClass(sa)}">${sa}</span></td>`+
+        `<td class="${stopHit?'neg':''}">${ev.stop!=null?fmt(ev.stop):'—'}${stopHit?' ⚠️':''}</td>`+del;
+    }
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('a.pjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
+  body.querySelectorAll('a.pdel').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); removeHolding(a.dataset.sym); }));
+}
+async function refreshPortfolio(){
+  const source=document.getElementById('source').value;
+  const st=document.getElementById('pf-status');
+  if(source==='csv'){ st.textContent='CSVは一括更新に非対応。Twelve Data/Stooqを選んでください。'; return; }
+  const p=getPortfolio(); if(!p.length){ st.textContent='登録がありません。'; return; }
+  const btn=document.getElementById('pf-refresh'); btn.disabled=true; btn.textContent='更新中…';
+  let spy=null; try{ st.textContent='ベンチマーク取得中…'; spy=await getBenchmark(source);}catch(e){}
+  const onWait=sec=>{ st.textContent=`レート制限調整中… ${sec}秒待機（無料枠8回/分）`; };
+  for(let i=0;i<p.length;i++){
+    const sym=p[i].sym; st.textContent=`取得中 ${i+1}/${p.length}: ${sym}`;
+    let d=null;
+    for(let attempt=0;attempt<2 && !d;attempt++){
+      try{ d=await fetchSeries(sym,source,onWait); }
+      catch(e){ const msg=e.message||'失敗';
+        if(attempt===0 && /limit|429|credit|多すぎ|too many/i.test(msg)){ onWait(60); await sleep(60000); continue; }
+        pfLast[sym]={err:msg}; break; }
+    }
+    if(d){
+      d.rs= spy? rsRatingApprox(d.close,spy.close):null;
+      d.marketOK= spy? marketRegime(spy.close):null;
+      const r=judge(d);
+      pfLast[sym]={close:r.close, sellAction:r.sell.action, stop:(r.levels?r.levels.stop:null), rs:r.rs};
+    }
+    renderPortfolio();
+    if(i<p.length-1) await sleep(source==='twelvedata'?150:400);
+  }
+  const okN=p.filter(h=>pfLast[h.sym]&&!pfLast[h.sym].err).length;
+  const hit=p.filter(h=>{const e=pfLast[h.sym]; return e&&!e.err&&e.stop!=null&&e.close<e.stop;}).length;
+  st.textContent=`完了：${okN}/${p.length} 件` + (hit?`　⚠️ 損切りライン到達 ${hit}件`:'');
+  btn.disabled=false; btn.textContent='📊 一括更新';
+}
+
 // フィルター/プリセット変更時、取得済みデータで表を再評価（再取得なし）
 function reScreen(){
   if(!scrnRows.length) return;
@@ -1882,6 +1986,9 @@ document.getElementById('riskpct').addEventListener('input',updateShares);
 document.getElementById('entrypx').addEventListener('input',updatePL);
 document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
+document.getElementById('pf-add').addEventListener('click',addHolding);
+document.getElementById('pf-refresh').addEventListener('click',refreshPortfolio);
+['pf-sym','pf-buy','pf-sh'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') addHolding(); }));
 document.getElementById('bt-run').addEventListener('click',backtest);
 document.getElementById('bt-wl').addEventListener('click',backtestWatchlist);
 document.getElementById('bt-opt').addEventListener('click',optimizeWeights);
@@ -1939,6 +2046,7 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   // 前回のスクリーニング結果を復元（再判定には再実行が必要）
   try{ const sv=JSON.parse(localStorage.getItem('scrn')||'null'); if(sv&&sv.length){ scrnRows=sv; renderScreen(); document.getElementById('csv').style.display='inline-flex'; document.getElementById('scr-status').textContent='前回の結果を表示中（フィルター反映には再スクリーニング）。'; } }catch(e){}
   renderRecent();
+  renderPortfolio();
 })();
 // 文字サイズ調整
 function setFont(delta){
