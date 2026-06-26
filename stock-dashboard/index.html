@@ -172,7 +172,15 @@ a{color:var(--ac)}
 .bkpill{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer}
 .bkpill.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
 #th-bklist a{color:var(--ac);font-weight:900;text-decoration:none;margin-right:2px}
-.bkchip{display:inline-block;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:3px 8px;margin:3px 4px 0 0;font-weight:700}
+.bkchip{display:inline-block;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:5px 10px;margin:4px 5px 0 0;font-weight:700;cursor:pointer;min-height:32px}
+.bkchip b{color:var(--ac)}
+.bkchip:active{border-color:var(--ac)}
+.chhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.chtitle{font-size:15px;font-weight:900}
+.chstats{font-size:13px;font-weight:900}
+.chlegend{margin-top:6px;color:var(--muted)}
+.chlegend i{display:inline-block;width:11px;height:3px;border-radius:2px;margin:0 3px 0 8px;vertical-align:middle}
+canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12px;display:block}
 .bkpill .bn{font-size:22px;font-weight:900;line-height:1}
 .bkpill .bl{font-size:10px;color:var(--muted);font-weight:800;margin-top:4px;line-height:1.3}
 .bkpill.pos .bn{color:var(--ok)} .bkpill.neg .bn{color:var(--ng)}
@@ -267,7 +275,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v40<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v41<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -605,6 +613,21 @@ a{color:var(--ac)}
         <ul class="reasons" id="reasons"></ul>
       </details>
       </details>
+    </div>
+
+    <div class="card" id="chartcard">
+      <h2>📈 価格チャート（MA・出来高・RSI）</h2>
+      <div class="chhead">
+        <div class="chtitle"><span id="ch-sym">—</span> <span class="muted" id="ch-name"></span></div>
+        <div class="chstats"><span id="ch-period" class="pos"></span> ・ <span id="ch-day"></span> <span class="muted" id="ch-asof" style="font-weight:700"></span></div>
+      </div>
+      <div class="segbtns" id="ch-range" style="margin:8px 0 4px">
+        <button data-b="21">1ヶ月</button><button data-b="63">3ヶ月</button><button data-b="126" class="on">6ヶ月</button><button data-b="252">1年</button>
+      </div>
+      <canvas id="ch-canvas" style="width:100%;height:340px"></canvas>
+      <div class="chlegend tiny" id="ch-legend"></div>
+      <div class="tiny muted" id="ch-rsi" style="margin-top:2px"></div>
+      <div class="tiny muted" style="margin-top:4px">取得したOHLCVから本ツールが描画（出所はデータ取得元）。</div>
     </div>
 
     <div class="card">
@@ -1455,6 +1478,57 @@ function renderChart(sym,exch){
   }catch(e){ box.innerHTML='<div class="tiny muted" style="padding:14px">チャート読み込み不可（オフライン等）。判定パネルは利用できます。</div>'; }
 }
 
+/* ===== 自前の価格チャート（ローソク足＋MA＋出来高＋RSI） ===== */
+let chartBars=126;
+const MA_DEFS=[{len:20,c:'#a78bfa'},{len:50,c:'#60a5fa'},{len:75,c:'#22d3ee'},{len:100,c:'#4ade80'},{len:150,c:'#eab308'},{len:200,c:'#f472b6'}];
+function smaSeries(arr,len){ const out=Array(arr.length).fill(null); let s=0; for(let i=0;i<arr.length;i++){ s+=arr[i]; if(i>=len) s-=arr[i-len]; if(i>=len-1) out[i]=s/len; } return out; }
+function rsiSeries(close,len){ const out=Array(close.length).fill(null); let g=0,l=0;
+  for(let i=1;i<close.length;i++){ const ch=close[i]-close[i-1], up=Math.max(0,ch), dn=Math.max(0,-ch);
+    if(i<=len){ g+=up; l+=dn; if(i===len){ g/=len; l/=len; out[i]=100-100/(1+(l===0?100:g/l)); } }
+    else { g=(g*(len-1)+up)/len; l=(l*(len-1)+dn)/len; out[i]=100-100/(1+(l===0?100:g/l)); } }
+  return out; }
+function drawMiniChart(){
+  const d=lastData, cv=document.getElementById('ch-canvas'); if(!d||!cv||!d.close) return;
+  const n=d.close.length, bars=Math.min(chartBars,n), i0=n-bars; if(bars<2) return;
+  const pchg=(d.close[n-1]/d.close[i0]-1)*100, dchg=n>=2?(d.close[n-1]/d.close[n-2]-1)*100:0;
+  const pLab={21:'1ヶ月',63:'3ヶ月',126:'半年',252:'1年'}[chartBars]||`${chartBars}本`;
+  document.getElementById('ch-sym').textContent=lastSym||'';
+  document.getElementById('ch-name').textContent=NAMES[lastSym]||'';
+  const se=document.getElementById('ch-period'); se.textContent=`${pLab} ${pchg>=0?'+':''}${pchg.toFixed(1)}%`; se.className=pchg>=0?'pos':'neg';
+  const de=document.getElementById('ch-day'); de.textContent=`1日 ${dchg>=0?'+':''}${dchg.toFixed(1)}%`; de.className=dchg>=0?'pos':'neg';
+  document.getElementById('ch-asof').textContent=(d.time&&d.time[n-1])?`終値: ${d.time[n-1]}`:'';
+  const cssW=cv.clientWidth||cv.parentElement.clientWidth||320, cssH=340, dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cssW,cssH);
+  const padL=6,padR=46,padT=6, W=cssW-padL-padR;
+  const priceH=cssH*0.60, volH=cssH*0.15, rsiH=cssH*0.19, gap=6;
+  const priceTop=padT, volTop=priceTop+priceH+gap, rsiTop=volTop+volH+gap;
+  const mas=MA_DEFS.map(m=>({...m, ser:smaSeries(d.close,m.len)}));
+  let pMax=-Infinity,pMin=Infinity;
+  for(let i=i0;i<n;i++){ pMax=Math.max(pMax,d.high[i]); pMin=Math.min(pMin,d.low[i]); for(const m of mas){ const v=m.ser[i]; if(v!=null){ pMax=Math.max(pMax,v); pMin=Math.min(pMin,v); } } }
+  const pRng=(pMax-pMin)||1, X=k=>padL+(bars<=1?0:k/(bars-1))*W, Yp=v=>priceTop+(1-(v-pMin)/pRng)*priceH;
+  ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.fillStyle='#7587a0'; ctx.font='10px sans-serif'; ctx.textAlign='left';
+  for(let g=0;g<=4;g++){ const v=pMin+pRng*g/4, y=Yp(v); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+W,y); ctx.stroke(); ctx.fillText(v.toFixed(v<10?2:0), padL+W+3, y+3); }
+  const cw=Math.max(1, W/bars*0.62);
+  for(let k=0;k<bars;k++){ const i=i0+k, o=d.open[i],c=d.close[i],h=d.high[i],l=d.low[i], up=c>=o, col=up?'#22c55e':'#ef4444', x=X(k);
+    ctx.strokeStyle=col; ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(x,Yp(h)); ctx.lineTo(x,Yp(l)); ctx.stroke();
+    const yo=Yp(o),yc=Yp(c); ctx.fillRect(x-cw/2, Math.min(yo,yc), cw, Math.max(1,Math.abs(yc-yo))); }
+  for(const m of mas){ ctx.strokeStyle=m.c; ctx.lineWidth=1.2; ctx.beginPath(); let st=false;
+    for(let k=0;k<bars;k++){ const v=m.ser[i0+k]; if(v==null){ st=false; continue; } const x=X(k),y=Yp(v); if(!st){ ctx.moveTo(x,y); st=true; } else ctx.lineTo(x,y); } ctx.stroke(); }
+  ctx.lineWidth=1;
+  let vMax=0; for(let i=i0;i<n;i++) vMax=Math.max(vMax,d.volume[i]||0); vMax=vMax||1;
+  for(let k=0;k<bars;k++){ const i=i0+k, up=d.close[i]>=d.open[i], x=X(k), bh=((d.volume[i]||0)/vMax)*volH;
+    ctx.fillStyle=up?'rgba(34,197,94,.5)':'rgba(239,68,68,.5)'; ctx.fillRect(x-cw/2, volTop+volH-bh, cw, bh); }
+  ctx.fillStyle='#7587a0'; ctx.fillText('出来高', padL+1, volTop+10);
+  const rsi=rsiSeries(d.close,14), Yr=v=>rsiTop+(1-v/100)*rsiH;
+  [30,50,70].forEach(lv=>{ const y=Yr(lv); ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.setLineDash(lv===50?[]:[3,3]); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+W,y); ctx.stroke(); });
+  ctx.setLineDash([]); ctx.fillStyle='#7587a0'; ctx.fillText('RSI', padL+1, rsiTop+10);
+  ctx.strokeStyle='#f59e0b'; ctx.lineWidth=1.3; ctx.beginPath(); let st=false;
+  for(let k=0;k<bars;k++){ const v=rsi[i0+k]; if(v==null){ st=false; continue; } const x=X(k),y=Yr(v); if(!st){ ctx.moveTo(x,y); st=true; } else ctx.lineTo(x,y); } ctx.stroke(); ctx.lineWidth=1;
+  const rlast=rsi[n-1]; document.getElementById('ch-rsi').textContent=rlast!=null?`RSI(14): ${rlast.toFixed(1)}`:'';
+  document.getElementById('ch-legend').innerHTML='移動平均 '+MA_DEFS.map(m=>`<i style="background:${m.c}"></i>${m.len}`).join(' ');
+}
+
 /* ===== 実行 ===== */
 function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.textContent='エラー: '+msg; }
 function clearErr(){ const e=document.getElementById('err'); e.style.display='none'; e.textContent=''; }
@@ -1527,6 +1601,7 @@ async function run(){
     lastData=d; lastSym=sym;
     const r=judge(d);
     render(sym,d,r);
+    drawMiniChart();
     renderChart(sym,exch);
     if(source!=='csv') addRecent(sym);
     localStorage.setItem('last_sym',sym);
@@ -1567,6 +1642,7 @@ function runDemo(){
   lastData=d; lastSym='DEMO';
   const r=judge(d);
   render('DEMO',d,r);
+  drawMiniChart();
   document.getElementById('symlabel').textContent='DEMO（サンプルデータ）';
   renderChart(document.getElementById('symbol').value.trim().toUpperCase()||'NBIS',
               document.getElementById('exchange').value.trim().toUpperCase());
@@ -1931,9 +2007,9 @@ function renderBkList(cat,keep){
   __bkSel=cat;
   document.querySelectorAll('#th-bkgrid .bkpill').forEach(p=>p.classList.toggle('sel',p.dataset.cat===cat));
   if(!c.list.length){ box.innerHTML=`<span class="muted">「${c.label}」に該当する銘柄はありません。</span>`; return; }
-  box.innerHTML=`<div style="margin-bottom:4px"><b>${c.label}</b>（${c.list.length}銘柄）</div>`+
-    c.list.map(s=>`<span class="bkchip"><a href="#" class="thjump" data-sym="${s}">${s}</a> <span class="muted">${NAMES[s]||''}</span></span>`).join('');
-  box.querySelectorAll('a.thjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
+  box.innerHTML=`<div style="margin-bottom:4px"><b>${c.label}</b>（${c.list.length}銘柄）<span class="muted">— タップで個別判定へ</span></div>`+
+    c.list.map(s=>`<span class="bkchip" data-sym="${s}"><b>${s}</b> <span class="muted">${NAMES[s]||''}</span></span>`).join('');
+  box.querySelectorAll('.bkchip').forEach(el=>el.addEventListener('click',()=>{ document.getElementById('symbol').value=el.dataset.sym; run(); }));
 }
 function renderThemes(){
   const box=document.getElementById('th-body');
@@ -2284,6 +2360,9 @@ document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('pf-add').addEventListener('click',addHolding);
 document.getElementById('pf-refresh').addEventListener('click',refreshPortfolio);
+document.getElementById('ch-range').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  chartBars=+b.dataset.b; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); drawMiniChart(); });
+let _chRz; window.addEventListener('resize',()=>{ clearTimeout(_chRz); _chRz=setTimeout(()=>{ if(lastData) drawMiniChart(); },200); });
 document.getElementById('th-run').addEventListener('click',runThemes);
 document.getElementById('th-period').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
   themePeriod=+b.dataset.b; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderThemes(); });
