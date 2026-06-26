@@ -267,7 +267,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v39<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v40<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -1602,12 +1602,18 @@ function renderRecent(){
 
 /* ===== スクリーニング ===== */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let scrnRows=[], scrnSort={k:'score',dir:-1};
+let scrnRows=[], scrnSort={k:'score',dir:-1}, scrnTs=null;
 async function screen(){
   const source=document.getElementById('source').value;
   if(source==='csv'){ document.getElementById('scr-status').textContent='CSVはスクリーニング非対応。Twelve Data/Stooqを選んでください。'; return; }
   const syms=[...new Set((document.getElementById('wl').value||'').split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))].slice(0,30);
   if(!syms.length){ document.getElementById('scr-status').textContent='銘柄を入力してください。'; return; }
+  // 取得済みの結果があれば「最新に更新するか」を確認
+  if(scrnRows.some(r=>r.ok)){
+    if(!confirm(`最新データに更新しますか？${scrnTs?`（前回取得: ${fmtTs(scrnTs)}）`:''}\n\nOK＝再取得（数分かかる場合あり）\nキャンセル＝前回の結果を表示`)){
+      document.getElementById('scr-status').textContent='前回の結果を表示中'+(scrnTs?`（取得: ${fmtTs(scrnTs)}）`:''); return;
+    }
+  }
   const btn=document.getElementById('screen'); btn.disabled=true; btn.textContent='実行中…';
   const st=document.getElementById('scr-status');
   localStorage.setItem('wl',document.getElementById('wl').value);
@@ -1636,7 +1642,8 @@ async function screen(){
     if(i<syms.length-1) await sleep(source==='twelvedata'?150:400);
   }
   const okN=scrnRows.filter(r=>r.ok).length;
-  st.textContent=`完了：${okN}/${syms.length} 件取得` + (okN<syms.length?'（失敗は銘柄表記/未対応銘柄の可能性。少し待って再実行を）':'');
+  scrnTs=Date.now();
+  st.textContent=`完了：${okN}/${syms.length} 件取得（取得: ${fmtTs(scrnTs)}）` + (okN<syms.length?'（失敗は銘柄表記/未対応銘柄の可能性。少し待って再実行を）':'');
   btn.disabled=false; btn.textContent='スクリーニング';
   document.getElementById('csv').style.display= okN? 'inline-flex':'none';
   saveScreen();
@@ -1676,6 +1683,9 @@ function renderScreen(){
 function getPortfolio(){ try{ return JSON.parse(localStorage.getItem('portfolio')||'[]'); }catch(e){ return []; } }
 function savePortfolio(p){ localStorage.setItem('portfolio',JSON.stringify(p)); }
 let pfLast={}; // sym -> {close,sellAction,stop,rs} or {err}
+let pfTs=null;
+function savePfResults(){ try{ localStorage.setItem('pfResults',JSON.stringify({ts:pfTs||Date.now(),data:pfLast})); }catch(e){} }
+function loadPfResults(){ try{ const o=JSON.parse(localStorage.getItem('pfResults')||'null'); if(o&&o.data){ pfLast=o.data; pfTs=o.ts||null; } }catch(e){} }
 function sellActClass(a){ return a.indexOf('売り')===0?'wait':a.indexOf('警戒')===0?'hold':a.indexOf('一部利確')===0?'tp':'buy'; }
 function addHolding(){
   const sym=(document.getElementById('pf-sym').value||'').trim().toUpperCase();
@@ -1726,6 +1736,13 @@ async function refreshPortfolio(){
   const st=document.getElementById('pf-status');
   if(source==='csv'){ st.textContent='CSVは一括更新に非対応。Twelve Data/Stooqを選んでください。'; return; }
   const p=getPortfolio(); if(!p.length){ st.textContent='登録がありません。'; return; }
+  // 取得済みがあれば「最新に更新するか」を確認
+  const hasData=Object.keys(pfLast).some(s=>pfLast[s]&&!pfLast[s].err);
+  if(hasData){
+    if(!confirm(`保有銘柄を最新データに更新しますか？${pfTs?`（前回取得: ${fmtTs(pfTs)}）`:''}\n\nOK＝再取得\nキャンセル＝前回データを表示`)){
+      renderPortfolio(); st.textContent='前回データを表示中'+(pfTs?`（取得: ${fmtTs(pfTs)}）`:''); return;
+    }
+  }
   const btn=document.getElementById('pf-refresh'); btn.disabled=true; btn.textContent='更新中…';
   let spy=null; try{ st.textContent='ベンチマーク取得中…'; spy=await getBenchmark(source);}catch(e){}
   const onWait=sec=>{ st.textContent=`レート制限調整中… ${sec}秒待機（無料枠8回/分）`; };
@@ -1749,7 +1766,8 @@ async function refreshPortfolio(){
   }
   const okN=p.filter(h=>pfLast[h.sym]&&!pfLast[h.sym].err).length;
   const hit=p.filter(h=>{const e=pfLast[h.sym]; return e&&!e.err&&e.stop!=null&&e.close<e.stop;}).length;
-  st.textContent=`完了：${okN}/${p.length} 件` + (hit?`　⚠️ 損切りライン到達 ${hit}件`:'');
+  pfTs=Date.now(); savePfResults();
+  st.textContent=`完了：${okN}/${p.length} 件（取得: ${fmtTs(pfTs)}）` + (hit?`　⚠️ 損切りライン到達 ${hit}件`:'');
   btn.disabled=false; btn.textContent='📊 一括更新';
 }
 
@@ -1976,9 +1994,14 @@ function reScreen(){
     row.action=r.action; row.ttPass=r.ttPass; row.ttEval=r.ttEval; row.rs=r.rs; row.gain=r.gainFromMA; row.score=r.score; row.nearBreakout=r.nearBreakout; } });
   renderScreen(); saveScreen();
 }
-// スクリーニング結果を保存/復元（軽量・dは除く）
+// スクリーニング結果を保存/復元（軽量行＋系列データ）
 function saveScreen(){
-  try{ const lite=scrnRows.map(({d,...r})=>r); localStorage.setItem('scrn',JSON.stringify(lite)); }catch(e){}
+  try{ const lite=scrnRows.map(({d,...r})=>r); localStorage.setItem('scrn',JSON.stringify({ts:scrnTs||Date.now(),rows:lite})); }catch(e){}
+  // 系列も保存（再読込後もフィルター再評価を再取得なしで可能に）。容量超過時は黙ってスキップ
+  try{ const data={}; scrnRows.forEach(r=>{ if(r.ok&&r.d){ const d=r.d,n=d.close.length,k=Math.min(260,n),st=n-k;
+      data[r.sym]={close:d.close.slice(st),high:d.high.slice(st),low:d.low.slice(st),volume:d.volume.slice(st),time:d.time?d.time.slice(st):null,rs:d.rs,marketOK:d.marketOK}; } });
+    localStorage.setItem('scrnData',JSON.stringify(data));
+  }catch(e){ try{ localStorage.removeItem('scrnData'); }catch(_){} }
 }
 function exportCSV(){
   if(!scrnRows.length) return;
@@ -2323,10 +2346,22 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   const bench=localStorage.getItem('bench'); if(bench) document.getElementById('bench').value=bench;
   // 文字サイズ復元
   const fs=localStorage.getItem('fontscale'); if(fs) document.documentElement.style.fontSize=fs;
-  // 前回のスクリーニング結果を復元（再判定には再実行が必要）
-  try{ const sv=JSON.parse(localStorage.getItem('scrn')||'null'); if(sv&&sv.length){ scrnRows=sv; renderScreen(); document.getElementById('csv').style.display='inline-flex'; document.getElementById('scr-status').textContent='前回の結果を表示中（フィルター反映には再スクリーニング）。'; } }catch(e){}
+  // 前回のスクリーニング結果を復元（系列も復元できればフィルター即反映）
+  try{ const sv=JSON.parse(localStorage.getItem('scrn')||'null');
+    const rows = Array.isArray(sv)? sv : (sv&&sv.rows);
+    scrnTs = Array.isArray(sv)? null : (sv&&sv.ts)||null;
+    if(rows&&rows.length){ scrnRows=rows;
+      let hasSeries=false;
+      try{ const sd=JSON.parse(localStorage.getItem('scrnData')||'null'); if(sd){ scrnRows.forEach(r=>{ if(r.ok&&sd[r.sym]){ r.d=sd[r.sym]; hasSeries=true; } }); } }catch(e){}
+      renderScreen(); document.getElementById('csv').style.display='inline-flex';
+      document.getElementById('scr-status').textContent='前回の結果を表示中'+(scrnTs?`（取得: ${fmtTs(scrnTs)}）`:'')+(hasSeries?'。フィルターも即反映':'（フィルター反映には再スクリーニング）');
+    }
+  }catch(e){}
   renderRecent();
+  // 保有管理：前回の評価結果を復元（更新は確認後のみ）
+  loadPfResults();
   renderPortfolio();
+  if(Object.keys(pfLast).length && pfTs){ const ps=document.getElementById('pf-status'); if(ps) ps.textContent=`前回データ表示中（取得: ${fmtTs(pfTs)}）。更新は「📊一括更新」を押す`; }
   // テーマ・トラッカー：前回取得データを復元（再取得は確認後のみ）
   loadThemeCache();
   if(Object.keys(themeData).length){ renderThemes();
