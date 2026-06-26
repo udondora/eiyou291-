@@ -169,7 +169,10 @@ a{color:var(--ac)}
 .lvbox .v{font-size:18px;font-weight:900;margin-top:2px}
 .lvbox .d{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35}
 .bkgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.bkpill{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 6px;text-align:center}
+.bkpill{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer}
+.bkpill.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
+#th-bklist a{color:var(--ac);font-weight:900;text-decoration:none;margin-right:2px}
+.bkchip{display:inline-block;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:3px 8px;margin:3px 4px 0 0;font-weight:700}
 .bkpill .bn{font-size:22px;font-weight:900;line-height:1}
 .bkpill .bl{font-size:10px;color:var(--muted);font-weight:800;margin-top:4px;line-height:1.3}
 .bkpill.pos .bn{color:var(--ok)} .bkpill.neg .bn{color:var(--ng)}
@@ -264,7 +267,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v38<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v39<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -389,6 +392,7 @@ a{color:var(--ac)}
           <div class="segbtns" id="th-dir"><button data-d="up" class="on">上抜け</button><button data-d="down">下抜け</button></div>
         </div>
         <div class="bkgrid" id="th-bkgrid"></div>
+        <div id="th-bklist" class="tiny" style="margin-top:8px"></div>
         <div class="tiny muted" id="th-bknote" style="margin-top:6px"></div>
       </div>
       <div id="th-body" style="margin-top:10px"><div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div></div>
@@ -1775,6 +1779,22 @@ const NAMES={NVDA:'エヌビディア',AMD:'AMD',AVGO:'ブロードコム',MRVL:
 let themeData={};     // sym -> 取得した series d（または {err}）
 let themePeriod=21;   // 騰落率の計算バー数
 let __themeRows=[];
+let themeCacheTs=null;
+const THCACHE_KEY='themeCache';
+function saveThemeCache(){
+  try{ const out={ts:themeCacheTs||Date.now(), data:{}};
+    for(const s of Object.keys(themeData)){ const d=themeData[s]; if(!d||d.err) continue;
+      const n=d.close.length, k=Math.min(260,n), st=n-k;
+      out.data[s]={close:d.close.slice(st),high:d.high.slice(st),low:d.low.slice(st),volume:d.volume.slice(st)}; }
+    localStorage.setItem(THCACHE_KEY,JSON.stringify(out));
+  }catch(e){ /* 容量超過などは無視 */ }
+}
+function loadThemeCache(){
+  try{ const o=JSON.parse(localStorage.getItem(THCACHE_KEY)||'null'); if(!o||!o.data) return;
+    themeData={}; for(const s in o.data) themeData[s]=o.data[s]; themeCacheTs=o.ts||null;
+  }catch(e){}
+}
+function fmtTs(ts){ if(!ts) return ''; const d=new Date(ts), p=x=>String(x).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 function themeUniq(){ return [...new Set(THEMES.flatMap(t=>t.syms))]; }
 function chgOf(d,bars){ const c=d.close,n=c.length-1,j=Math.max(0,n-bars); return j<n?(c[n]/c[j]-1)*100:null; }
 // 出来高変化率: 直近20日平均 ÷ その前20日平均 −1（%）
@@ -1814,6 +1834,15 @@ async function runThemes(){
   const source=document.getElementById('source').value;
   const st=document.getElementById('th-status');
   if(source==='csv'){ st.textContent='CSVはテーマ分析に非対応。Twelve Data/Stooqを選んでください。'; return; }
+  // 取得済みデータがある場合は「最新に更新するか」を確認
+  const hasData=Object.keys(themeData).some(s=>themeData[s]&&!themeData[s].err);
+  if(hasData){
+    const when=themeCacheTs?`（前回取得: ${fmtTs(themeCacheTs)}）`:'';
+    if(!confirm(`最新データに更新しますか？${when}\n\nOK＝全銘柄を再取得（数分かかる場合あり）\nキャンセル＝前回データをそのまま表示`)){
+      renderThemes(); st.textContent='前回データを表示中'+(themeCacheTs?`（取得: ${fmtTs(themeCacheTs)}）`:'')+'。更新は「📊テーマ分析」を再度。'; return;
+    }
+    themeData={}; __bkSel=null; // 全再取得
+  }
   const syms=themeUniq();
   const btn=document.getElementById('th-run'); btn.disabled=true; btn.textContent='分析中…';
   const onWait=sec=>{ st.textContent=`レート制限調整中… ${sec}秒待機（無料枠8回/分）`; };
@@ -1833,7 +1862,8 @@ async function runThemes(){
     if(i<syms.length-1) await sleep(source==='twelvedata'?150:400);
   }
   const okN=syms.filter(s=>themeData[s]&&!themeData[s].err).length;
-  st.textContent=`完了：${okN}/${syms.length} 銘柄`;
+  themeCacheTs=Date.now(); saveThemeCache();
+  st.textContent=`完了：${okN}/${syms.length} 銘柄（取得: ${fmtTs(themeCacheTs)}）`;
   btn.disabled=false; btn.textContent='📊 テーマ分析';
   renderThemes();
 }
@@ -1856,22 +1886,36 @@ function crossedMA(d,len,dir,lookback=5){
   }
   return false;
 }
+let __bkCats={}, __bkSel=null;
 function renderBreakout(){
-  const all=Object.keys(themeData).map(s=>themeData[s]).filter(d=>d&&!d.err);
+  const syms=Object.keys(themeData).filter(s=>themeData[s]&&!themeData[s].err);
   const wrap=document.getElementById('th-breakout');
-  if(!all.length){ wrap.style.display='none'; return; }
+  if(!syms.length){ wrap.style.display='none'; return; }
   wrap.style.display='block';
-  const tot=all.length;
-  const nh=all.filter(newHigh).length, nl=all.filter(newLow).length;
-  const cross=all.filter(d=>crossedMA(d,breakMA,breakDir)).length;
-  const vs=all.filter(volSurge).length;
   const dirLab=breakDir==='up'?'上抜け':'下抜け';
-  document.getElementById('th-bkgrid').innerHTML=
-    `<div class="bkpill pos"><div class="bn">${nh}</div><div class="bl">52週高値 更新</div></div>`+
-    `<div class="bkpill neg"><div class="bn">${nl}</div><div class="bl">52週安値 更新</div></div>`+
-    `<div class="bkpill"><div class="bn">${cross}</div><div class="bl">MA${breakMA} ${dirLab}</div></div>`+
-    `<div class="bkpill"><div class="bn">${vs}</div><div class="bl">出来高急増(1.5x)</div></div>`;
-  document.getElementById('th-bknote').textContent=`対象 ${tot}銘柄（テーマ・トラッカーで取得済み）。${dirLab}＝直近5営業日内に価格がMA${breakMA}を${breakDir==='up'?'下から上へ':'上から下へ'}クロス。`;
+  __bkCats={
+    nh:{label:'52週高値 更新', cls:'pos', list:syms.filter(s=>newHigh(themeData[s]))},
+    nl:{label:'52週安値 更新', cls:'neg', list:syms.filter(s=>newLow(themeData[s]))},
+    cross:{label:`MA${breakMA} ${dirLab}`, cls:'', list:syms.filter(s=>crossedMA(themeData[s],breakMA,breakDir))},
+    vs:{label:'出来高急増(1.5x)', cls:'', list:syms.filter(s=>volSurge(themeData[s]))},
+  };
+  document.getElementById('th-bkgrid').innerHTML=['nh','nl','cross','vs'].map(k=>{
+    const c=__bkCats[k];
+    return `<div class="bkpill ${c.cls} ${__bkSel===k?'sel':''}" data-cat="${k}"><div class="bn">${c.list.length}</div><div class="bl">${c.label}</div></div>`;
+  }).join('');
+  document.getElementById('th-bkgrid').querySelectorAll('.bkpill').forEach(el=>el.addEventListener('click',()=>renderBkList(el.dataset.cat)));
+  document.getElementById('th-bknote').textContent=`対象 ${syms.length}銘柄（テーマ・トラッカーで取得済み）。${dirLab}＝直近5営業日内に価格がMA${breakMA}を${breakDir==='up'?'下から上へ':'上から下へ'}クロス。数字をタップで該当銘柄を表示。`;
+  if(__bkSel && __bkCats[__bkSel]) renderBkList(__bkSel,true); else document.getElementById('th-bklist').innerHTML='';
+}
+function renderBkList(cat,keep){
+  const box=document.getElementById('th-bklist'); const c=__bkCats[cat]; if(!c) return;
+  if(__bkSel===cat && !keep){ __bkSel=null; box.innerHTML=''; document.querySelectorAll('#th-bkgrid .bkpill').forEach(p=>p.classList.remove('sel')); return; }
+  __bkSel=cat;
+  document.querySelectorAll('#th-bkgrid .bkpill').forEach(p=>p.classList.toggle('sel',p.dataset.cat===cat));
+  if(!c.list.length){ box.innerHTML=`<span class="muted">「${c.label}」に該当する銘柄はありません。</span>`; return; }
+  box.innerHTML=`<div style="margin-bottom:4px"><b>${c.label}</b>（${c.list.length}銘柄）</div>`+
+    c.list.map(s=>`<span class="bkchip"><a href="#" class="thjump" data-sym="${s}">${s}</a> <span class="muted">${NAMES[s]||''}</span></span>`).join('');
+  box.querySelectorAll('a.thjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
 }
 function renderThemes(){
   const box=document.getElementById('th-body');
@@ -2283,6 +2327,10 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   try{ const sv=JSON.parse(localStorage.getItem('scrn')||'null'); if(sv&&sv.length){ scrnRows=sv; renderScreen(); document.getElementById('csv').style.display='inline-flex'; document.getElementById('scr-status').textContent='前回の結果を表示中（フィルター反映には再スクリーニング）。'; } }catch(e){}
   renderRecent();
   renderPortfolio();
+  // テーマ・トラッカー：前回取得データを復元（再取得は確認後のみ）
+  loadThemeCache();
+  if(Object.keys(themeData).length){ renderThemes();
+    const ts=document.getElementById('th-status'); if(ts&&themeCacheTs) ts.textContent=`前回データ表示中（取得: ${fmtTs(themeCacheTs)}）。更新は「📊テーマ分析」を押す`; }
 })();
 // 文字サイズ調整
 function setFont(delta){
