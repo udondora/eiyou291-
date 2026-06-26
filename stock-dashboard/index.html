@@ -232,7 +232,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v30<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v31<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -1889,6 +1889,7 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   const acct=localStorage.getItem('acct'); if(acct) document.getElementById('acct').value=acct;
   document.getElementById('acct').addEventListener('input',e=>localStorage.setItem('acct',e.target.value));
   const wl=localStorage.getItem('wl'); if(wl) document.getElementById('wl').value=wl;
+  document.getElementById('wl').addEventListener('input',e=>localStorage.setItem('wl',e.target.value)); // 編集即保存（スクリーニング実行を待たない）
   const pre=localStorage.getItem('preset')||'normal';
   document.getElementById('preset').value=pre; applyPreset(pre);
   // フィルター状態を復元
