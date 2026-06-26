@@ -68,14 +68,13 @@ button.btn:active{transform:translateY(1px)}
 .is-ok{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12)} .is-ok .v{color:var(--ok)}
 .is-ng{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.12)} .is-ng .v{color:var(--ng)}
 .is-wait{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.12)} .is-wait .v{color:var(--wait)}
-.entrymsg{margin-top:8px;padding:9px 12px;border-radius:10px;font-size:13px;font-weight:800;border:1px solid var(--bd);background:var(--sf2);line-height:1.5}
-.entrymsg::before{content:'⏱ エントリー：';color:var(--muted);font-weight:900}
-.entrymsg.ok{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.1);color:var(--ok)}
-.entrymsg.ok::before{content:'✅ エントリー：'}
-.entrymsg.wait{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.1);color:var(--wait)}
-.entrymsg.wait::before{content:'⏳ エントリー：'}
-.entrymsg.ng{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.1);color:var(--ng)}
-.entrymsg.ng::before{content:'⛔ エントリー：'}
+.diaglist{display:flex;flex-direction:column;gap:6px}
+.diag{padding:8px 11px;border-radius:9px;font-size:12.5px;font-weight:700;border:1px solid var(--bd);background:var(--sf2);line-height:1.5}
+.diag .lab{font-weight:900;color:var(--muted);margin-right:3px}
+.diag::before{content:'• ';color:var(--muted)}
+.diag.ok{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.09);color:#bbf7d0} .diag.ok::before{content:'✅ '}
+.diag.wait{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.09);color:#fde68a} .diag.wait::before{content:'⏳ '}
+.diag.ng{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.09);color:#fecaca} .diag.ng::before{content:'⛔ '}
 
 /* judgment table */
 table.jt{width:100%;border-collapse:collapse;font-size:13px}
@@ -230,7 +229,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v28<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v29<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -423,7 +422,11 @@ a{color:var(--ac)}
         <div class="vchip" id="vc-tp"><div class="k">利確</div><div class="v">—</div></div>
         <div class="vchip" id="vc-act"><div class="k">行動</div><div class="v">—</div></div>
       </div>
-      <div id="entrymsg" class="entrymsg">—</div>
+      <div class="diaglist" style="margin-top:8px">
+        <div id="diag-trend" class="diag"></div>
+        <div id="diag-entry" class="diag"></div>
+        <div id="diag-tp" class="diag"></div>
+      </div>
 
       <table class="jt" style="margin-top:12px">
         <tr><td class="k">銘柄</td><td class="v" id="t-sym"></td><td class="k">終値</td><td class="v" id="t-close"></td></tr>
@@ -821,6 +824,21 @@ function judge(d){
   else if(volX!=null && volX<=CONFIG.volSurge && !nearMA){ entryMsg=`出来高不足（${volX.toFixed(1)}x）— 出来高を伴うブレイクを待つ`; entryTone='wait'; }
   else { entryMsg='エントリー条件が未充足 — 待機'; entryTone='wait'; }
 
+  // --- トレンド診断 ---
+  let trendMsg, trendTone;
+  if(trend==='OK'){ trendTone='ok'; trendMsg = aboveEma9? '上昇配列が完成（価格>9EMA>21EMA・主要MA上）' : '上昇トレンド維持（9EMAは一時割れ＝押し目）'; }
+  else { trendTone='ng';
+    if(ema21!=null && close<ema21) trendMsg='21EMA割れ（短期トレンド崩れ）';
+    else if(!aboveMA) trendMsg='主要MA(50/200日)を下回る';
+    else if(!emaUp) trendMsg='21EMAが下向き（勢い低下）';
+    else trendMsg='上昇トレンド未成立';
+  }
+
+  // --- 利確診断 ---
+  let tpMsg, tpTone;
+  if(tp==='OK'){ tpTone='wait'; tpMsg=`過熱（21EMAから${gTxt}）— 一部利確やトレーリングを検討`; }
+  else { tpTone='ok'; tpMsg='過熱なし — 慌てて利確不要（トレンド継続まで保有でOK）'; }
+
   // --- 売却・保有判断（保有者向け） ---
   let sellSwing=Infinity;                          // 直近10日の安値（当日除く）
   for(let i=Math.max(0,n-10);i<n;i++) sellSwing=Math.min(sellSwing,d.low[i]);
@@ -905,7 +923,7 @@ function judge(d){
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
     trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK,
-    score,scoreParts,nearBreakout,weeklyUp,avgDollarVol,sell,entryMsg,entryTone
+    score,scoreParts,nearBreakout,weeklyUp,avgDollarVol,sell,entryMsg,entryTone,trendMsg,trendTone,tpMsg,tpTone
   };
 }
 
@@ -1168,7 +1186,10 @@ function render(sym,d,r){
   setVerdict('vc-entry',r.entry);
   setVerdict('vc-tp',r.tp);
   setVerdict('vc-act',r.action.replace('(押し目)','')); // チップは短く（詳細はヘッドライン）
-  const em=document.getElementById('entrymsg'); em.className='entrymsg '+(r.entryTone||''); em.textContent=r.entryMsg||'—';
+  const diag=(id,lab,tone,msg)=>{ const e=document.getElementById(id); e.className='diag '+(tone||''); e.innerHTML=`<span class="lab">${lab}</span>${msg||'—'}`; };
+  diag('diag-trend','トレンド：',r.trendTone,r.trendMsg);
+  diag('diag-entry','エントリー：',r.entryTone,r.entryMsg);
+  diag('diag-tp','利確：',r.tpMsg?r.tpTone:'',r.tpMsg);
 
   document.getElementById('t-sym').textContent=sym;
   document.getElementById('t-close').textContent=fmt(r.close);
