@@ -176,15 +176,23 @@ a{color:var(--ac)}
 .segbtns{display:inline-flex;gap:4px}
 .segbtns button{background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:12px;padding:6px 10px;min-height:34px;cursor:pointer}
 .segbtns button.on{background:var(--ac);color:#00110e;border-color:var(--ac)}
-.throw{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--soft);cursor:pointer}
-.thrank{font-weight:900;color:var(--muted);width:18px;text-align:center;flex:none}
-.thmain{flex:1;min-width:0}
-.thname{font-weight:900;font-size:13.5px}
-.thspark{width:80px;flex:none;line-height:0}
-.thchg{width:62px;text-align:right;font-size:14px;font-weight:900;flex:none}
-.thdetail{padding:2px 4px 10px 32px}
-.thpill{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--soft);font-size:12.5px;font-weight:700}
+.thcard{padding:10px 2px;border-bottom:1px solid var(--soft);cursor:pointer}
+.thtop{display:flex;align-items:center;gap:9px}
+.thrank{font-weight:900;color:#00110e;background:var(--ac);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+.thnamewrap{flex:1;min-width:0}
+.thname{font-weight:900;font-size:14px}
+.thmeta{font-size:10.5px;color:var(--muted);font-weight:700;margin-top:2px;line-height:1.3}
+.thbigwrap{text-align:right;flex:none}
+.thbig{font-size:17px;font-weight:900;line-height:1}
+.thday{font-size:10.5px;font-weight:800;margin-top:2px}
+.thsparkwrap{margin-top:6px;line-height:0}
+.thrange{display:block;font-size:10px;color:var(--muted);font-weight:700;margin-top:3px;line-height:1.2}
+.thdetail{padding:4px 4px 12px 30px}
+.thpill{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--soft);font-size:12.5px;font-weight:700}
+.thpill .thnm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.thpill .thnums{flex:none;text-align:right;display:flex;gap:10px;align-items:baseline}
 .thpill a{color:var(--ac);font-weight:900;text-decoration:none}
+.thpill .co{color:var(--muted);font-weight:700;font-size:11px;margin-left:5px}
 .gloss{margin:10px 0 0}
 .gloss dt{font-weight:900;font-size:13px;color:var(--ac);margin-top:10px}
 .gloss dd{margin:2px 0 0;font-size:12.5px;font-weight:600;line-height:1.5;color:var(--tx)}
@@ -256,7 +264,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v37<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v38<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -369,7 +377,7 @@ a{color:var(--ac)}
       <div class="row" style="margin-top:8px">
         <button id="th-run" class="btn">📊 テーマ分析</button>
         <div class="segbtns" id="th-period">
-          <button data-b="5">1週</button><button data-b="21" class="on">1ヶ月</button><button data-b="63">3ヶ月</button>
+          <button data-b="1">1日</button><button data-b="5">1週</button><button data-b="21" class="on">1ヶ月</button><button data-b="63">3ヶ月</button><button data-b="126">6ヶ月</button>
         </div>
         <span class="tiny muted" id="th-status"></span>
       </div>
@@ -1754,11 +1762,42 @@ const THEMES=[
   {name:'宇宙/防衛', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
   {name:'量子コンピュータ', syms:['IONQ','RGTI','QBTS','QUBT']},
 ];
+const NAMES={NVDA:'エヌビディア',AMD:'AMD',AVGO:'ブロードコム',MRVL:'マーベル',TSM:'TSMC',
+  AMAT:'アプライド',LRCX:'ラムリサーチ',KLAC:'KLA',ASML:'ASML',TSEM:'タワーセミ',
+  MU:'マイクロン',STX:'シーゲート',WDC:'ウエスタンデジタル',SNDK:'サンディスク',NTAP:'ネットアップ',
+  COHR:'コヒレント',LITE:'ルメンタム',AAOI:'アプライドオプト',CIEN:'シエナ',ANET:'アリスタ',
+  VRT:'バーティブ',NBIS:'Nebius',CRWV:'コアウィーブ',SMCI:'スーパーマイクロ',DELL:'デル',
+  PLTR:'パランティア',NET:'クラウドフレア',MSFT:'マイクロソフト',GOOGL:'アルファベット',META:'メタ',
+  VST:'ビストラ',CEG:'コンステレーション',GEV:'GEベルノバ',OKLO:'オクロ',SMR:'ニュースケール',
+  BE:'ブルームエナジー',PLUG:'プラグパワー',FSLR:'ファーストソーラー',ENPH:'エンフェーズ',
+  RKLB:'ロケットラボ',ASTS:'AST',LMT:'ロッキード',KTOS:'クラトス',AVAV:'エアロバイロメント',
+  IONQ:'アイオンキュー',RGTI:'リゲッティ',QBTS:'Dウェーブ',QUBT:'クオンタム'};
 let themeData={};     // sym -> 取得した series d（または {err}）
 let themePeriod=21;   // 騰落率の計算バー数
 let __themeRows=[];
 function themeUniq(){ return [...new Set(THEMES.flatMap(t=>t.syms))]; }
 function chgOf(d,bars){ const c=d.close,n=c.length-1,j=Math.max(0,n-bars); return j<n?(c[n]/c[j]-1)*100:null; }
+// 出来高変化率: 直近20日平均 ÷ その前20日平均 −1（%）
+function volChgOf(d){ const v=d.volume,n=v.length-1; if(n<41) return null;
+  let a=0,b=0; for(let i=n-19;i<=n;i++) a+=v[i]; for(let i=n-39;i<=n-20;i++) b+=v[i];
+  return b>0?((a/20)/(b/20)-1)*100:null; }
+// リッチなスパークライン（塗りつぶし＋終点ドット）。レンジ%も返す
+function themeSparkRich(ds,L){
+  const arrs=ds.map(d=>{ const c=d.close,n=c.length-1,len=Math.min(L,n+1); const seg=c.slice(n-len+1,n+1); const base=seg[0]; return base>0?seg.map(x=>x/base*100):null; }).filter(a=>a&&a.length>=2);
+  if(!arrs.length) return null;
+  const minLen=Math.min(...arrs.map(a=>a.length));
+  const avg=[]; for(let k=0;k<minLen;k++){ let s=0; for(const a of arrs) s+=a[a.length-minLen+k]; avg.push(s/arrs.length); }
+  const W=300,H=40,mn=Math.min(...avg),mx=Math.max(...avg),rng=(mx-mn)||1;
+  const X=i=>(i/(avg.length-1)*W), Y=v=>(H-2-(v-mn)/rng*(H-4));
+  const line=avg.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const up=avg[avg.length-1]>=avg[0], col=up?'#22c55e':'#ef4444', fill=up?'rgba(34,197,94,.13)':'rgba(239,68,68,.13)';
+  const lx=X(avg.length-1).toFixed(1), ly=Y(avg[avg.length-1]).toFixed(1);
+  const svg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="40">`+
+    `<polygon points="0,${H} ${line} ${W},${H}" fill="${fill}" stroke="none"/>`+
+    `<polyline points="${line}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`+
+    `<circle cx="${lx}" cy="${ly}" r="2.6" fill="${col}"/></svg>`;
+  return {svg, maxPct:mx-100, minPct:mn-100};
+}
 function aboveMA20(d){ const c=d.close,n=c.length-1; if(n<19) return false; let s=0; for(let i=n-19;i<=n;i++) s+=c[i]; return c[n]>s/20; }
 function near52h(d){ const h=d.high,c=d.close,n=c.length-1,j=Math.max(0,n-251); let hi=-Infinity; for(let i=j;i<=n;i++) hi=Math.max(hi,h[i]); return hi>0 && (c[n]/hi-1)*100>=-3; }
 function themeSpark(ds,L){
@@ -1839,39 +1878,48 @@ function renderThemes(){
   renderBreakout();
   const anyData=Object.keys(themeData).some(s=>themeData[s]&&!themeData[s].err);
   if(!anyData){ box.innerHTML='<div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div>'; return; }
+  const pLab={1:'1日',5:'1週',21:'1ヶ月',63:'3ヶ月',126:'6ヶ月'}[themePeriod]||'';
   __themeRows=THEMES.map(t=>{
     const ds=t.syms.map(s=>themeData[s]).filter(d=>d&&!d.err);
-    const chgs=ds.map(d=>chgOf(d,themePeriod)).filter(x=>x!=null);
-    const avg=chgs.length? chgs.reduce((a,b)=>a+b,0)/chgs.length : null;
-    return {t, ds, n:ds.length, total:t.syms.length, avg,
-      aboveN:ds.filter(aboveMA20).length, hotN:ds.filter(near52h).length, spark:themeSpark(ds,60)};
+    const avgOf=fn=>{ const a=ds.map(fn).filter(x=>x!=null); return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; };
+    return {t, ds, n:ds.length, total:t.syms.length,
+      avg:avgOf(d=>chgOf(d,themePeriod)), day:avgOf(d=>chgOf(d,1)), volc:avgOf(volChgOf),
+      aboveN:ds.filter(aboveMA20).length, hotN:ds.filter(near52h).length, spark:themeSparkRich(ds,126)};
   }).sort((a,b)=>(b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg));
-  box.innerHTML=__themeRows.map((r,idx)=>{
-    const avgTxt=r.avg==null?'—':(r.avg>=0?'+':'')+r.avg.toFixed(1)+'%';
-    const avgCls=r.avg==null?'muted':r.avg>=0?'pos':'neg';
-    return `<div class="throw" data-i="${idx}">`+
-      `<div class="thrank">${idx+1}</div>`+
-      `<div class="thmain"><div class="thname">${r.t.name} <span class="tiny muted">${r.n}/${r.total}</span></div>`+
-      `<div class="thsub tiny muted">20日線上 ${r.aboveN}/${r.n}　🔥接近 ${r.hotN}</div></div>`+
-      `<div class="thspark">${r.spark||''}</div>`+
-      `<div class="thchg ${avgCls}">${avgTxt}</div></div>`+
+  const sg=(v,d=1)=>v==null?'—':(v>=0?'+':'')+v.toFixed(d)+'%';
+  const cl=v=>v==null?'muted':v>=0?'pos':'neg';
+  box.innerHTML=`<div class="tiny muted" style="margin:2px 0 6px">TOP（${pLab}騰落率順）・行タップで構成銘柄</div>`+__themeRows.map((r,idx)=>{
+    const volTxt=r.volc==null?'—':(r.volc>=0?'+':'')+r.volc.toFixed(0)+'%';
+    const rangeTxt=r.spark?`推移(直近6ヶ月) <span class="pos">+${r.spark.maxPct.toFixed(0)}%</span> / <span class="neg">${r.spark.minPct.toFixed(0)}%</span>`:'';
+    return `<div class="thcard" data-i="${idx}">`+
+      `<div class="thtop">`+
+        `<span class="thrank">${idx+1}</span>`+
+        `<div class="thnamewrap"><div class="thname">${r.t.name}</div>`+
+        `<div class="thmeta">20日線上 ${r.aboveN}/${r.n} ・ 🔥${r.hotN} ・ 出来高 ${volTxt}</div></div>`+
+        `<div class="thbigwrap"><div class="thbig ${cl(r.avg)}">${sg(r.avg)}</div>`+
+        `<div class="thday ${cl(r.day)}">1日 ${sg(r.day)}</div></div>`+
+      `</div>`+
+      `<div class="thsparkwrap">${r.spark?r.spark.svg:''}<span class="thrange">${rangeTxt}</span></div>`+
+      `</div>`+
       `<div class="thdetail" id="thd-${idx}" style="display:none"></div>`;
   }).join('');
-  box.querySelectorAll('.throw').forEach(el=>el.addEventListener('click',()=>toggleThemeDetail(+el.dataset.i)));
+  box.querySelectorAll('.thcard').forEach(el=>el.addEventListener('click',()=>toggleThemeDetail(+el.dataset.i)));
 }
 function toggleThemeDetail(idx){
   const r=__themeRows[idx], el=document.getElementById('thd-'+idx); if(!r||!el) return;
   if(el.style.display==='block'){ el.style.display='none'; return; }
-  const items=r.t.syms.map(s=>{ const d=themeData[s]; let chg=null,err=null,above=false,hot=false;
-    if(!d) err='未取得'; else if(d.err) err=d.err; else { chg=chgOf(d,themePeriod); above=aboveMA20(d); hot=near52h(d); }
-    return {s,chg,err,above,hot}; })
+  const items=r.t.syms.map(s=>{ const d=themeData[s]; let chg=null,day=null,err=null,above=false,hot=false;
+    if(!d) err='未取得'; else if(d.err) err=d.err; else { chg=chgOf(d,themePeriod); day=chgOf(d,1); above=aboveMA20(d); hot=near52h(d); }
+    return {s,chg,day,err,above,hot}; })
     .sort((a,b)=>(b.chg==null?-1e9:b.chg)-(a.chg==null?-1e9:a.chg));
   el.innerHTML=items.map(it=>{
     const c=it.chg==null?'—':(it.chg>=0?'+':'')+it.chg.toFixed(1)+'%';
     const cls=it.chg==null?'muted':it.chg>=0?'pos':'neg';
-    return `<div class="thpill"><span>${it.hot?'🔥':''}<a href="#" class="thjump" data-sym="${it.s}">${it.s}</a>`+
-      `${it.above?' <span class="tiny muted">20MA上</span>':''}${it.err?` <span class="tiny muted">(${it.err})</span>`:''}</span>`+
-      `<span class="${cls}">${c}</span></div>`;
+    const dTxt=it.day==null?'':(it.day>=0?'+':'')+it.day.toFixed(1)+'%';
+    const dCls=it.day==null?'muted':it.day>=0?'pos':'neg';
+    return `<div class="thpill"><span class="thnm">${it.hot?'🔥':''}<a href="#" class="thjump" data-sym="${it.s}">${it.s}</a>`+
+      `<span class="co">${NAMES[it.s]||''}</span>${it.above?' <span class="tiny muted">20MA上</span>':''}${it.err?` <span class="tiny muted">(${it.err})</span>`:''}</span>`+
+      `<span class="thnums"><span class="${cls}">${c}</span>${dTxt?`<span class="${dCls}" style="font-size:11px">1日${dTxt}</span>`:''}</span></div>`;
   }).join('');
   el.style.display='block';
   el.querySelectorAll('a.thjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
