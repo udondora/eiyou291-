@@ -37,7 +37,12 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,Bli
 #fabs{position:fixed;right:14px;bottom:16px;z-index:25;display:flex;flex-direction:column;gap:8px}
 .fab{width:46px;height:46px;border-radius:50%;border:1px solid var(--bd);background:rgba(23,32,51,.95);color:var(--tx);font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);display:none;align-items:center;justify-content:center}
 .fab.show{display:flex}
-.wrap{max-width:920px;margin:0 auto;padding:16px 14px 60px}
+.wrap{max-width:920px;margin:0 auto;padding:16px 14px 60px;display:flex;flex-direction:column}
+.wrap>*{order:5} /* 既定の並び。order小さいほど上 */
+#result{order:2}            /* 判定結果（買い→売り）を入力直後に */
+.card.tools{order:3}        /* フィルター/スクリーニング/バックテスト */
+.card.summary{order:9}      /* 判定ロジック要約は最後 */
+#inputcard{order:1}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .field{display:flex;flex-direction:column;gap:5px}
 label.lbl{font-size:12px;color:var(--muted);font-weight:800}
@@ -216,7 +221,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v25<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v26<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -224,7 +229,7 @@ a{color:var(--ac)}
 <div class="wrap">
 
   <!-- 入力 -->
-  <div class="card">
+  <div class="card" id="inputcard">
     <h2>① 銘柄とデータ</h2>
     <div class="row">
       <div class="field">
@@ -286,7 +291,7 @@ a{color:var(--ac)}
   </div>
 
   <!-- 買い候補フィルター -->
-  <div class="card">
+  <div class="card tools">
     <details id="filterbox">
       <summary class="fsum">🔧 買い候補フィルター <span id="filtcount" class="tiny muted"></span></summary>
       <div class="filters2">
@@ -303,7 +308,7 @@ a{color:var(--ac)}
   </div>
 
   <!-- ウォッチリスト・スクリーニング -->
-  <div class="card">
+  <div class="card tools">
     <h2>🔎 ウォッチリスト・スクリーニング</h2>
     <div class="tiny muted">複数銘柄をまとめて判定し、トレンドテンプレ達成数・RSで並べ替え（取得元は上の「データ取得元」を使用。Twelve Data 推奨）。</div>
     <textarea id="wl" class="t" style="margin-top:8px" placeholder="例: NBIS, RKLB, NVDA, AAPL, PLTR（カンマ/改行/スペース区切り・最大30）">NVDA NBIS GEV LITE MU SNDK STX AAOI ASX MRVL AMAT TSEM VICR PLTR OKLO TSLA SPCX SIMO MXL MKSI FLEX NET SKM BE RKLB PL CRWV</textarea>
@@ -322,7 +327,7 @@ a{color:var(--ac)}
   </div>
 
   <!-- バックテスト -->
-  <div class="card">
+  <div class="card tools">
     <details id="btbox">
       <summary class="fsum">🧪 バックテスト <span class="tiny muted">（上の「銘柄」で過去検証）</span></summary>
       <div class="tiny muted" style="margin-top:6px">過去の各日まで（未来を見ない）で判定を再実行し、買い候補→翌日始値でエントリー、損切り/利確/トレンド崩れで手仕舞いを再現します。取得元は上の設定（長期データのため Twelve Data / Stooq 推奨）。</div>
@@ -510,7 +515,7 @@ a{color:var(--ac)}
     </div>
   </div>
 
-  <div class="card small muted">
+  <div class="card small muted summary">
     <b>判定ロジック（要約）</b><br/>
     Trend＝価格&gt;9EMA&gt;21EMA の段階＋主要MA(50/200)上＋<b>21EMA上向き</b>で <b>OK</b>（RSは買い候補フィルターで評価）。<br/>
     Entry＝Trendが OK かつ過熱でない押し目/ブレイクで <b>OK</b>、伸び切りは <b>待機</b>。<br/>
