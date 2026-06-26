@@ -256,7 +256,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v36<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v37<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -1744,12 +1744,15 @@ async function refreshPortfolio(){
 /* ===== テーマ・トラッカー ===== */
 const THEMES=[
   {name:'AI半導体', syms:['NVDA','AMD','AVGO','MRVL','TSM']},
-  {name:'半導体製造装置', syms:['AMAT','LRCX','KLAC','ASML']},
-  {name:'データストレージ', syms:['STX','WDC','SNDK','NTAP']},
-  {name:'AIインフラ/クラウド', syms:['NBIS','CRWV','NET','PLTR','VRT']},
-  {name:'原子力/電力', syms:['OKLO','SMR','CEG','VST','GEV']},
-  {name:'宇宙/防衛', syms:['RKLB','ASTS','LMT','KTOS']},
-  {name:'光通信/ネットワーク', syms:['AAOI','COHR','LITE','CIEN']},
+  {name:'半導体製造装置', syms:['AMAT','LRCX','KLAC','ASML','TSEM']},
+  {name:'メモリ/ストレージ', syms:['MU','STX','WDC','SNDK','NTAP']},
+  {name:'光通信/ネットワーク', syms:['COHR','LITE','AAOI','CIEN','ANET']},
+  {name:'AIインフラ/データセンター', syms:['VRT','NBIS','CRWV','SMCI','DELL']},
+  {name:'クラウド/AIソフト', syms:['PLTR','NET','MSFT','GOOGL','META']},
+  {name:'電力/原子力', syms:['VST','CEG','GEV','OKLO','SMR']},
+  {name:'燃料電池/クリーンエネ', syms:['BE','PLUG','FSLR','ENPH']},
+  {name:'宇宙/防衛', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
+  {name:'量子コンピュータ', syms:['IONQ','RGTI','QBTS','QUBT']},
 ];
 let themeData={};     // sym -> 取得した series d（または {err}）
 let themePeriod=21;   // 騰落率の計算バー数
