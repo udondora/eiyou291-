@@ -68,6 +68,14 @@ button.btn:active{transform:translateY(1px)}
 .is-ok{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12)} .is-ok .v{color:var(--ok)}
 .is-ng{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.12)} .is-ng .v{color:var(--ng)}
 .is-wait{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.12)} .is-wait .v{color:var(--wait)}
+.entrymsg{margin-top:8px;padding:9px 12px;border-radius:10px;font-size:13px;font-weight:800;border:1px solid var(--bd);background:var(--sf2);line-height:1.5}
+.entrymsg::before{content:'⏱ エントリー：';color:var(--muted);font-weight:900}
+.entrymsg.ok{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.1);color:var(--ok)}
+.entrymsg.ok::before{content:'✅ エントリー：'}
+.entrymsg.wait{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.1);color:var(--wait)}
+.entrymsg.wait::before{content:'⏳ エントリー：'}
+.entrymsg.ng{border-color:rgba(239,68,68,.45);background:rgba(239,68,68,.1);color:var(--ng)}
+.entrymsg.ng::before{content:'⛔ エントリー：'}
 
 /* judgment table */
 table.jt{width:100%;border-collapse:collapse;font-size:13px}
@@ -222,7 +230,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v27<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v28<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -415,6 +423,7 @@ a{color:var(--ac)}
         <div class="vchip" id="vc-tp"><div class="k">利確</div><div class="v">—</div></div>
         <div class="vchip" id="vc-act"><div class="k">行動</div><div class="v">—</div></div>
       </div>
+      <div id="entrymsg" class="entrymsg">—</div>
 
       <table class="jt" style="margin-top:12px">
         <tr><td class="k">銘柄</td><td class="v" id="t-sym"></td><td class="k">終値</td><td class="v" id="t-close"></td></tr>
@@ -799,6 +808,19 @@ function judge(d){
   else if(marketBlocked) action='様子見';        // 地合い弱は様子見
   else action='保有/待機';
 
+  // --- エントリー診断（"今買えるか／何を待つか"を一言で） ---
+  const gTxt = gainFromMA!=null? (gainFromMA>=0?'+':'')+gainFromMA.toFixed(0)+'%' : '';
+  let entryMsg, entryTone;
+  if(trend!=='OK'){ entryMsg='トレンド未成立 — 新規は見送り'; entryTone='ng'; }
+  else if(entry==='OK'){
+    entryMsg = entryKind==='押し目'? `今が押し目買いゾーン（21EMA近辺・乖離${gTxt}）` : `出来高を伴うブレイク初動（出来高${volX!=null?volX.toFixed(1)+'x':'—'}）`;
+    entryTone='ok';
+  } else if(hot){ entryMsg=`過熱（21EMAから${gTxt}）— 新規は不利。押し目を待つ`; entryTone='ng'; }
+  else if(blocks.length){ entryMsg=`セットアップは出たが除外：${blocks.join(' / ')}`; entryTone='wait'; }
+  else if(gainFromMA!=null && gainFromMA>CONFIG.gainFromMA_entryMax){ entryMsg=`伸び切り（21EMAから${gTxt}）— 押し目（9/21EMA付近）まで待つ`; entryTone='wait'; }
+  else if(volX!=null && volX<=CONFIG.volSurge && !nearMA){ entryMsg=`出来高不足（${volX.toFixed(1)}x）— 出来高を伴うブレイクを待つ`; entryTone='wait'; }
+  else { entryMsg='エントリー条件が未充足 — 待機'; entryTone='wait'; }
+
   // --- 売却・保有判断（保有者向け） ---
   let sellSwing=Infinity;                          // 直近10日の安値（当日除く）
   for(let i=Math.max(0,n-10);i<n;i++) sellSwing=Math.min(sellSwing,d.low[i]);
@@ -883,7 +905,7 @@ function judge(d){
     close,ema9,ema21,sma50,sma150,sma200,atrPct,atrMult,gainFromMA,rsi14,
     vol,volAvg,volX,half,from52high,from52low,stacked,aboveMA,emaUp,hot,rs,
     trend,entry,tp,action,reasons,tt,ttPass,ttEval,advice,levels,blocks,marketOK:d.marketOK,
-    score,scoreParts,nearBreakout,weeklyUp,avgDollarVol,sell
+    score,scoreParts,nearBreakout,weeklyUp,avgDollarVol,sell,entryMsg,entryTone
   };
 }
 
@@ -1146,6 +1168,7 @@ function render(sym,d,r){
   setVerdict('vc-entry',r.entry);
   setVerdict('vc-tp',r.tp);
   setVerdict('vc-act',r.action.replace('(押し目)','')); // チップは短く（詳細はヘッドライン）
+  const em=document.getElementById('entrymsg'); em.className='entrymsg '+(r.entryTone||''); em.textContent=r.entryMsg||'—';
 
   document.getElementById('t-sym').textContent=sym;
   document.getElementById('t-close').textContent=fmt(r.close);
