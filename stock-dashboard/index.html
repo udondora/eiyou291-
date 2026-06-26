@@ -166,6 +166,9 @@ a{color:var(--ac)}
 .lvbox .k{font-size:11px;color:var(--muted);font-weight:800}
 .lvbox .v{font-size:18px;font-weight:900;margin-top:2px}
 .lvbox .d{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35}
+.gloss{margin:10px 0 0}
+.gloss dt{font-weight:900;font-size:13px;color:var(--ac);margin-top:10px}
+.gloss dd{margin:2px 0 0;font-size:12.5px;font-weight:600;line-height:1.5;color:var(--tx)}
 .lvbox.stop{border-color:rgba(239,68,68,.35)} .lvbox.stop .v{color:var(--ng)}
 .lvbox.tgt{border-color:rgba(34,197,94,.35)} .lvbox.tgt .v{color:var(--ok)}
 .sizebar{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
@@ -233,7 +236,7 @@ a{color:var(--ac)}
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v32<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v33<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -530,6 +533,29 @@ a{color:var(--ac)}
       <div class="chartbox" id="tvchart"></div>
       <div class="tiny muted" style="margin-top:6px">チャートはTradingViewの公式埋め込みウィジェット。判定パネルは取得したOHLCVから本ツールが独自計算しています。</div>
     </div>
+  </div>
+
+  <div class="card summary">
+    <details>
+      <summary class="csum">📖 用語ヘルプ（はじめての人向け）</summary>
+      <dl class="gloss">
+        <dt>トレンドテンプレート</dt><dd>強い上昇銘柄が満たす8つの条件（Minervini流）。何個満たすか「○/8」で表示。多いほど王道の上昇トレンド。</dd>
+        <dt>RS Rating</dt><dd>市場平均に対する強さの順位（1〜99）。70以上＝上位3割の強い銘柄。IBDの正確な値は手入力欄に入れると優先されます。</dd>
+        <dt>R（リスクの単位）</dt><dd>「1株買って損切りに当たると失う額」が <b>1R</b>。利益や損失をこの倍数で測るのが王道。例: 損切り幅が3.6ドルなら 1R=3.6、利益が7.2ドルなら +2R。</dd>
+        <dt>2R / 3R（利確目標）</dt><dd>1Rの2倍・3倍の利益が出る価格。まず2Rで半分利確、残りを3Rで、が基本の出口設計。</dd>
+        <dt>損切りライン</dt><dd>「ここを割れたら売って撤退」する価格。負けを限定するための線。これを最初に決めてから株数を計算します。</dd>
+        <dt>ポジションサイジング</dt><dd>「負けても口座資金の◯%しか減らない」株数の決め方。口座資金×リスク%÷1Rで自動計算（推奨株数）。</dd>
+        <dt>21EMA / 9EMA</dt><dd>直近21日・9日の指数移動平均（最近を重視した平均線）。価格&gt;21EMA かつ 9EMA&gt;21EMA を上昇トレンドの目安にしています。</dd>
+        <dt>スイング安値</dt><dd>直近の押し目でできた安値。損切りをよく置く場所。割れるとトレンド崩れのサイン。</dd>
+        <dt>押し目 / ブレイク</dt><dd>押し目＝上昇中の一時的な下げ（21EMA近辺）で買うチャンス。ブレイク＝高値圏を出来高を伴って上抜く初動。</dd>
+        <dt>ATR</dt><dd>1日の平均的な値動き幅（ボラティリティ）。損切り幅を「ATR×倍率」で値動きに合わせて決められます。</dd>
+        <dt>地合い</dt><dd>市場全体の調子（基準指数が上昇トレンドか）。地合いが弱いとスコアを下げ、買い候補を絞ります。</dd>
+        <dt>過熱 / 伸び切り</dt><dd>21EMAから離れすぎた状態。新規買いは不利で、押し目を待つ／一部利確の目安。</dd>
+        <dt>総合スコア</dt><dd>RS・8条件・セットアップ・地合いを合成した0〜100点。「今買うならどれ」の順位付け。配分は自分で調整可。</dd>
+        <dt>バックテスト / OOS</dt><dd>過去データで判定ロジックを検証。OOS＝後半の未知データでの成績。前半で良くて後半で崩れる＝最適化しすぎ（要注意）。</dd>
+      </dl>
+      <div class="tiny muted" style="margin-top:6px">⚠️ 投資助言ではありません。判定は機械的な目安で、最終判断はご自身の責任で。</div>
+    </details>
   </div>
 
   <div class="card small muted summary">
