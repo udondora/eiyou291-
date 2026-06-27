@@ -1,0 +1,16 @@
+{
+  "name": "管理栄養士国試 午前291問",
+  "short_name": "栄養士国試",
+  "description": "管理栄養士国家試験（午前）対策の291問 問題集。進捗記録・復習モード・検索つき。",
+  "start_url": "eiyou291_v26.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "ja",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
