@@ -22,13 +22,13 @@
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic','Noto Sans JP',Arial,sans-serif;line-height:1.6;padding-bottom:env(safe-area-inset-bottom)}
 .topwrap{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd)}
-.header{padding:9px 14px 4px;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.navbar{padding:2px 10px 7px;display:flex;flex-direction:column;gap:5px}
-.navtabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.header{padding:11px 14px 7px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.navbar{padding:4px 12px 10px;display:flex;flex-direction:column;gap:9px}
+.navtabs{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none}
 .navtabs::-webkit-scrollbar{display:none}
-.navtabs button{flex:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:9px;font-weight:800;font-size:12px;padding:6px 11px;min-height:33px;cursor:pointer;white-space:nowrap}
+.navtabs button{flex:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:9px;font-weight:800;font-size:12px;padding:7px 12px;min-height:35px;cursor:pointer;white-space:nowrap}
 .navtabs button.on{background:var(--ac);color:#04210f;border-color:var(--ac)}
-.navperiod{display:flex;gap:4px;overflow-x:auto;align-items:center;scrollbar-width:none}
+.navperiod{display:flex;gap:5px;overflow-x:auto;align-items:center;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.06);padding-top:9px}
 .navperiod::-webkit-scrollbar{display:none}
 .navplabel{font-size:10px;color:var(--muted);font-weight:800;flex:none;margin-right:2px}
 .navperiod button{flex:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:12px;padding:5px 9px;min-height:31px;cursor:pointer;white-space:nowrap}
@@ -214,7 +214,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
 .segbtns button.on{background:var(--ac);color:#00110e;border-color:var(--ac)}
 .thcard{padding:11px 5px 12px 9px;border-bottom:1px solid var(--soft);border-left:3px solid #22c55e;cursor:pointer}
 .thtop{display:flex;align-items:center;gap:9px}
-.thrank{font-weight:900;color:#04210f;background:#22c55e;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+.thrank{font-weight:900;color:#fff;background:#22c55e;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
 .thnamewrap{flex:1;min-width:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .thname{font-weight:900;font-size:14.5px;line-height:1.25}
 .thcat{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;color:#fff;white-space:nowrap;line-height:1.4}
@@ -308,7 +308,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
       <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
       <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-      <div class="hs" style="text-align:right">v49<br><span id="build" style="font-weight:700"></span></div>
+      <div class="hs" style="text-align:right">v50<br><span id="build" style="font-weight:700"></span></div>
     </div>
   </div>
   <div class="navbar">
@@ -1893,16 +1893,16 @@ async function refreshPortfolio(){
 
 /* ===== テーマ・トラッカー ===== */
 const THEMES=[
-  {name:'AI半導体', cat:'半導体', catc:'#ec4899', syms:['NVDA','AMD','AVGO','MRVL','TSM']},
-  {name:'半導体製造装置', cat:'半導体製造', catc:'#ec4899', syms:['AMAT','LRCX','KLAC','ASML','TSEM']},
-  {name:'メモリ/ストレージ', cat:'ハードウェア', catc:'#ec4899', syms:['MU','STX','WDC','SNDK','NTAP']},
-  {name:'光通信/ネットワーク', cat:'通信機器', catc:'#ec4899', syms:['COHR','LITE','AAOI','CIEN','ANET']},
-  {name:'AIインフラ/データセンター', cat:'AIインフラ', catc:'#ec4899', syms:['VRT','NBIS','CRWV','SMCI','DELL']},
-  {name:'クラウド/AIソフト', cat:'ソフトウェア', catc:'#3b82f6', syms:['PLTR','NET','MSFT','GOOGL','META']},
-  {name:'電力/原子力', cat:'電力・エネルギー', catc:'#10b981', syms:['VST','CEG','GEV','OKLO','SMR']},
-  {name:'燃料電池/クリーンエネ', cat:'クリーンエネ', catc:'#10b981', syms:['BE','PLUG','FSLR','ENPH']},
-  {name:'宇宙/防衛', cat:'宇宙・防衛', catc:'#6366f1', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
-  {name:'量子コンピュータ', cat:'量子', catc:'#a855f7', syms:['IONQ','RGTI','QBTS','QUBT']},
+  {name:'AI半導体', cat:'半導体', catc:'#e11d48', syms:['NVDA','AMD','AVGO','MRVL','TSM']},
+  {name:'半導体製造装置', cat:'半導体製造', catc:'#f97316', syms:['AMAT','LRCX','KLAC','ASML','TSEM']},
+  {name:'メモリ/ストレージ', cat:'ハードウェア', catc:'#0d9488', syms:['MU','STX','WDC','SNDK','NTAP']},
+  {name:'光通信/ネットワーク', cat:'通信機器', catc:'#2563eb', syms:['COHR','LITE','AAOI','CIEN','ANET']},
+  {name:'AIインフラ/データセンター', cat:'AIインフラ', catc:'#7c3aed', syms:['VRT','NBIS','CRWV','SMCI','DELL']},
+  {name:'クラウド/AIソフト', cat:'ソフトウェア', catc:'#0ea5e9', syms:['PLTR','NET','MSFT','GOOGL','META']},
+  {name:'電力/原子力', cat:'電力・エネルギー', catc:'#16a34a', syms:['VST','CEG','GEV','OKLO','SMR']},
+  {name:'燃料電池/クリーンエネ', cat:'クリーンエネ', catc:'#84cc16', syms:['BE','PLUG','FSLR','ENPH']},
+  {name:'宇宙/防衛', cat:'宇宙・防衛', catc:'#4f46e5', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
+  {name:'量子コンピュータ', cat:'量子', catc:'#c026d3', syms:['IONQ','RGTI','QBTS','QUBT']},
 ];
 const NAMES={NVDA:'エヌビディア',AMD:'AMD',AVGO:'ブロードコム',MRVL:'マーベル',TSM:'TSMC',
   AMAT:'アプライド',LRCX:'ラムリサーチ',KLAC:'KLA',ASML:'ASML',TSEM:'タワーセミ',
@@ -2075,9 +2075,9 @@ function renderThemes(){
   const spkBlock=sp=> sp?`<span class="spk-hi">+${sp.maxPct.toFixed(0)}%</span>${sp.svg}<span class="spk-lo">${sp.minPct>=0?'+':''}${sp.minPct.toFixed(0)}%</span><span class="spk-yr">1年</span>`:'';
   box.innerHTML=`<div class="tiny muted" style="margin:2px 0 8px">TOP（${pLab}騰落率順）・行タップで構成銘柄</div>`+__themeRows.map((r,idx)=>{
     const volTxt=r.volc==null?'—':(r.volc>=0?'+':'')+r.volc.toFixed(0)+'%';
-    return `<div class="thcard" data-i="${idx}">`+
+    return `<div class="thcard" data-i="${idx}" style="border-left-color:${r.t.catc||'#22c55e'}">`+
       `<div class="thtop">`+
-        `<span class="thrank">${idx+1}</span>`+
+        `<span class="thrank" style="background:${r.t.catc||'#22c55e'}">${idx+1}</span>`+
         `<div class="thnamewrap"><span class="thname">${r.t.name}</span>`+
         (r.t.cat?`<span class="thcat" style="background:${r.t.catc||'#64748b'}">${r.t.cat}</span>`:'')+`</div>`+
         `<div class="thright"><div class="thbig ${cl(r.avg)}">${sg(r.avg,0)}</div>`+
