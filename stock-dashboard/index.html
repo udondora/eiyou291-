@@ -204,7 +204,10 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
 .thbig{font-size:18px;font-weight:900;line-height:1}
 .thday{font-size:10px;font-weight:800;margin-top:2px}
 .thvol{font-size:9px;color:var(--muted);font-weight:700;margin-top:3px}
-.thdetail{padding:4px 4px 12px 30px}
+.thdetail{padding:2px 2px 10px 12px}
+.thcard.sub{background:rgba(255,255,255,.025);border-left-color:#16a34a}
+.thcard.sub .thname{font-size:13.5px}
+.thrank.sub{width:20px;height:20px;font-size:10px}
 .thpill{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--soft);font-size:12.5px;font-weight:700}
 .thpill .thnm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .thpill .thnums{flex:none;text-align:right;display:flex;gap:10px;align-items:baseline}
@@ -281,7 +284,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v45<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v46<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -2043,21 +2046,30 @@ function renderThemes(){
 function toggleThemeDetail(idx){
   const r=__themeRows[idx], el=document.getElementById('thd-'+idx); if(!r||!el) return;
   if(el.style.display==='block'){ el.style.display='none'; return; }
-  const items=r.t.syms.map(s=>{ const d=themeData[s]; let chg=null,day=null,err=null,above=false,hot=false;
-    if(!d) err='未取得'; else if(d.err) err=d.err; else { chg=chgOf(d,themePeriod); day=chgOf(d,1); above=aboveMA20(d); hot=near52h(d); }
-    return {s,chg,day,err,above,hot}; })
+  const sg=(v,dg=1)=>v==null?'—':(v>=0?'+':'')+v.toFixed(dg)+'%';
+  const cl=v=>v==null?'muted':v>=0?'pos':'neg';
+  const items=r.t.syms.map(s=>{ const d=themeData[s]; let chg=null,day=null,err=null,spark=null,above=false,hot=false;
+    if(!d) err='未取得'; else if(d.err) err=d.err; else { chg=chgOf(d,themePeriod); day=chgOf(d,1); spark=themeSparkRich([d],252); above=aboveMA20(d); hot=near52h(d); }
+    return {s,chg,day,err,spark,above,hot}; })
     .sort((a,b)=>(b.chg==null?-1e9:b.chg)-(a.chg==null?-1e9:a.chg));
-  el.innerHTML=items.map(it=>{
-    const c=it.chg==null?'—':(it.chg>=0?'+':'')+it.chg.toFixed(1)+'%';
-    const cls=it.chg==null?'muted':it.chg>=0?'pos':'neg';
-    const dTxt=it.day==null?'':(it.day>=0?'+':'')+it.day.toFixed(1)+'%';
-    const dCls=it.day==null?'muted':it.day>=0?'pos':'neg';
-    return `<div class="thpill"><span class="thnm">${it.hot?'🔥':''}<a href="#" class="thjump" data-sym="${it.s}">${it.s}</a>`+
-      `<span class="co">${NAMES[it.s]||''}</span>${it.above?' <span class="tiny muted">20MA上</span>':''}${it.err?` <span class="tiny muted">(${it.err})</span>`:''}</span>`+
-      `<span class="thnums"><span class="${cls}">${c}</span>${dTxt?`<span class="${dCls}" style="font-size:11px">1日${dTxt}</span>`:''}</span></div>`;
+  el.innerHTML=items.map((it,i)=>{
+    if(it.err) return `<div class="thcard sub"><div class="thtop"><span class="thrank sub">${i+1}</span>`+
+      `<div class="thnamewrap"><div class="thname">${it.s} <span class="thmeta" style="display:inline">${NAMES[it.s]||''}</span></div>`+
+      `<div class="thmeta">取得失敗: ${it.err}</div></div></div></div>`;
+    const spk=it.spark?`${it.spark.svg}<span class="spk-hi">+${it.spark.maxPct.toFixed(0)}%</span><span class="spk-lo">${it.spark.minPct>=0?'+':''}${it.spark.minPct.toFixed(0)}%</span>`:'';
+    return `<div class="thcard sub" data-sym="${it.s}">`+
+      `<div class="thtop">`+
+        `<span class="thrank sub">${i+1}</span>`+
+        `<div class="thnamewrap"><div class="thname">${it.hot?'🔥':''}${it.s}`+
+        `${it.above?' <span class="thcat" style="background:#475569">20MA上</span>':''}</div>`+
+        `<div class="thmeta">${NAMES[it.s]||''}</div></div>`+
+        `<div class="thspark">${spk}</div>`+
+        `<div class="thright"><div class="thbig ${cl(it.chg)}">${sg(it.chg,0)}</div>`+
+        `<div class="thday ${cl(it.day)}">1日 ${sg(it.day)}</div></div>`+
+      `</div></div>`;
   }).join('');
   el.style.display='block';
-  el.querySelectorAll('a.thjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
+  el.querySelectorAll('.thcard.sub[data-sym]').forEach(c=>c.addEventListener('click',e=>{ e.stopPropagation(); document.getElementById('symbol').value=c.dataset.sym; run(); }));
 }
 
 // フィルター/プリセット変更時、取得済みデータで表を再評価（再取得なし）
