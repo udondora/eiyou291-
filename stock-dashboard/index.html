@@ -21,7 +21,19 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic','Noto Sans JP',Arial,sans-serif;line-height:1.6;padding-bottom:env(safe-area-inset-bottom)}
-.header{position:sticky;top:0;z-index:20;background:rgba(15,23,42,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.topwrap{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd)}
+.header{padding:9px 14px 4px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.navbar{padding:2px 10px 7px;display:flex;flex-direction:column;gap:5px}
+.navtabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.navtabs::-webkit-scrollbar{display:none}
+.navtabs button{flex:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:9px;font-weight:800;font-size:12px;padding:6px 11px;min-height:33px;cursor:pointer;white-space:nowrap}
+.navtabs button.on{background:var(--ac);color:#04210f;border-color:var(--ac)}
+.navperiod{display:flex;gap:4px;overflow-x:auto;align-items:center;scrollbar-width:none}
+.navperiod::-webkit-scrollbar{display:none}
+.navplabel{font-size:10px;color:var(--muted);font-weight:800;flex:none;margin-right:2px}
+.navperiod button{flex:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:12px;padding:5px 9px;min-height:31px;cursor:pointer;white-space:nowrap}
+.navperiod button.on{background:var(--ac);color:#04210f;border-color:var(--ac)}
+#inputcard,#screencard,#themecard,#portcard,#result{scroll-margin-top:118px}
 .ht{font-weight:900;color:var(--ac);font-size:15px;line-height:1.2}
 .hs{font-size:11px;color:var(--muted);font-weight:800}
 .fbtn{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;font-weight:900;font-size:12px;min-width:32px;min-height:30px;cursor:pointer}
@@ -33,7 +45,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,Bli
 .scorebadge .track{flex:1;height:10px;border-radius:999px;background:var(--soft);overflow:hidden}
 .scorebadge .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ac),var(--teal))}
 .bo{display:inline-block;background:rgba(56,189,248,.16);color:var(--ac);border-radius:6px;padding:1px 7px;font-size:11px;font-weight:900;margin-left:6px}
-#updbar{display:none;position:sticky;top:0;z-index:30;background:linear-gradient(135deg,var(--ac),var(--teal));color:#00110e;font-weight:900;font-size:13px;text-align:center;padding:9px 12px;cursor:pointer}
+#updbar{display:none;background:linear-gradient(135deg,var(--ac),var(--teal));color:#00110e;font-weight:900;font-size:13px;text-align:center;padding:9px 12px;cursor:pointer}
 #fabs{position:fixed;right:14px;bottom:16px;z-index:25;display:flex;flex-direction:column;gap:8px}
 .fab{width:46px;height:46px;border-radius:50%;border:1px solid var(--bd);background:rgba(23,32,51,.95);color:var(--tx);font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);display:none;align-items:center;justify-content:center}
 .fab.show{display:flex}
@@ -278,13 +290,28 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
 </style>
 </head>
 <body>
-<div class="header">
-  <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">トレンドテンプレート判定 / 自前チャート</div></div>
-  <div style="display:flex;align-items:center;gap:6px">
-    <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
-    <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
-    <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v46<br><span id="build" style="font-weight:700"></span></div>
+<div class="topwrap">
+  <div class="header">
+    <div><div class="ht">📈 株価判断ダッシュボード</div><div class="hs">トレンドテンプレート判定 / 自前チャート</div></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
+      <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
+      <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
+      <div class="hs" style="text-align:right">v47<br><span id="build" style="font-weight:700"></span></div>
+    </div>
+  </div>
+  <div class="navbar">
+    <div class="navtabs" id="navtabs">
+      <button data-t="result">📊 判定</button>
+      <button data-t="themecard">🗺 テーマ</button>
+      <button data-t="screencard">🔎 スクリーニング</button>
+      <button data-t="portcard">💼 保有</button>
+      <button data-t="chartcard">📈 チャート</button>
+    </div>
+    <div class="navperiod" id="global-period">
+      <span class="navplabel">期間</span>
+      <button data-b="1">1日</button><button data-b="5">5日</button><button data-b="10">10日</button><button data-b="21">1ヶ月</button><button data-b="42">2ヶ月</button><button data-b="63" class="on">3ヶ月</button><button data-b="126">6ヶ月</button><button data-b="252">1年</button>
+    </div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -395,11 +422,9 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <div class="tiny muted" style="margin-top:6px">主要テーマの構成銘柄をまとめて取得し、<b>平均騰落率でランク付け</b>。テーマ内で<b>20日線の上にある銘柄数</b>・<b>新高値接近🔥数</b>とミニ推移も表示。「リーダー銘柄はリーダーテーマから」が王道です。テーマ行をタップで構成銘柄を表示（取得元は上の設定。Twelve Data推奨／初回は数分かかる場合あり）。</div>
       <div class="row" style="margin-top:8px">
         <button id="th-run" class="btn">📊 テーマ分析</button>
-        <div class="segbtns" id="th-period">
-          <button data-b="1">1日</button><button data-b="5">1週</button><button data-b="21">1ヶ月</button><button data-b="63" class="on">3ヶ月</button><button data-b="126">6ヶ月</button>
-        </div>
         <span class="tiny muted" id="th-status"></span>
       </div>
+      <div class="tiny muted" style="margin-top:4px">騰落率の期間は画面上部の「期間」で切替（テーマ一覧・チャート共通）。</div>
       <div id="th-breakout" style="display:none;margin-top:12px">
         <div class="tiny muted" style="margin-bottom:6px"><b>📈 ブレイク・サマリー（取得済み全銘柄の勢い）</b></div>
         <div class="row" style="align-items:center;gap:8px;margin-bottom:8px">
@@ -529,6 +554,10 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
         <div id="diag-entry" class="diag"></div>
         <div id="diag-tp" class="diag"></div>
       </div>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <button id="add-pf" class="btn alt" style="flex:1">💼 保有に追加</button>
+        <button id="add-wl" class="btn alt" style="flex:1">🔎 ウォッチに追加</button>
+      </div>
 
       <table class="jt" style="margin-top:12px">
         <tr><td class="k">銘柄</td><td class="v" id="t-sym"></td><td class="k">終値</td><td class="v" id="t-close"></td></tr>
@@ -629,11 +658,8 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
         <div class="chtitle"><span id="ch-sym">—</span> <span class="muted" id="ch-name"></span></div>
         <div class="chstats"><span id="ch-period" class="pos"></span> <span id="ch-day"></span> <span class="muted" id="ch-asof" style="font-weight:700"></span></div>
       </div>
-      <div class="tiny muted" style="margin-top:2px">期間ボタン＝表示する騰落率を選択（チャートは最低3ヶ月の日足）</div>
-      <div class="segbtns" id="ch-range" style="margin:8px 0 4px;flex-wrap:wrap">
-        <button data-b="1">1日</button><button data-b="5">5日</button><button data-b="10">10日</button><button data-b="21">1ヶ月</button><button data-b="42">2ヶ月</button><button data-b="63" class="on">3ヶ月</button><button data-b="126">6ヶ月</button><button data-b="252">12ヶ月</button>
-      </div>
-      <div class="tiny muted" id="ch-rangelabel" style="margin:2px 0 4px;font-weight:800;color:var(--tx)"></div>
+      <div class="tiny muted" style="margin-top:2px">騰落率の期間は上部の「期間」で切替（チャートは最低3ヶ月の日足）</div>
+      <div class="tiny muted" id="ch-rangelabel" style="margin:6px 0 4px;font-weight:800;color:var(--tx)"></div>
       <canvas id="ch-canvas" style="width:100%;height:340px"></canvas>
       <div class="chlegend tiny" id="ch-legend"></div>
       <div class="tiny muted" id="ch-rsi" style="margin-top:2px"></div>
@@ -1472,6 +1498,8 @@ async function loadOptions(dateTs){
 
 /* ===== 自前の価格チャート（ローソク足＋MA＋出来高＋RSI） ===== */
 let chartBars=63;
+let gPeriod=63;   // 共通の騰落率期間（テーマ一覧＋チャート）
+const GPLABS={1:'1日',5:'5日',10:'10日',21:'1ヶ月',42:'2ヶ月',63:'3ヶ月',126:'6ヶ月',252:'1年'};
 const MA_DEFS=[{len:20,c:'#a78bfa'},{len:50,c:'#60a5fa'},{len:75,c:'#22d3ee'},{len:100,c:'#4ade80'},{len:150,c:'#eab308'},{len:200,c:'#f472b6'}];
 function smaSeries(arr,len){ const out=Array(arr.length).fill(null); let s=0; for(let i=0;i<arr.length;i++){ s+=arr[i]; if(i>=len) s-=arr[i-len]; if(i>=len-1) out[i]=s/len; } return out; }
 function rsiSeries(close,len){ const out=Array(close.length).fill(null); let g=0,l=0;
@@ -1486,8 +1514,7 @@ function drawMiniChart(){
   const periodBars=Math.min(chartBars, n-1);
   const bars=Math.min(Math.max(chartBars,63), n), i0=n-bars; if(bars<2) return;
   const pchg=(d.close[n-1]/d.close[n-1-periodBars]-1)*100, dchg=(d.close[n-1]/d.close[n-2]-1)*100;
-  const PLABS={1:'1日',5:'5日',10:'10日',21:'1ヶ月',42:'2ヶ月',63:'3ヶ月',126:'6ヶ月',252:'12ヶ月'};
-  const pLab=PLABS[chartBars]||`${chartBars}本`;
+  const pLab=GPLABS[chartBars]||`${chartBars}本`;
   const sg=v=>(v>=0?'+':'')+v.toFixed(1)+'%';
   document.getElementById('ch-sym').textContent=lastSym||'';
   document.getElementById('ch-name').textContent=NAMES[lastSym]||'';
@@ -1774,6 +1801,28 @@ function addHolding(){
   renderPortfolio();
 }
 function removeHolding(sym){ savePortfolio(getPortfolio().filter(h=>h.sym!==sym)); delete pfLast[sym]; renderPortfolio(); }
+// 判定中の銘柄を保有リストへ（導線）
+function addCurrentToPortfolio(){
+  if(!lastSym){ alert('先に銘柄を判定してください。'); return; }
+  const sym=lastSym, last=(lastData&&lastData.close)?lastData.close[lastData.close.length-1]:null;
+  const buy=prompt(`${sym} を保有に追加。取得単価（任意・空欄可）`, last!=null?last.toFixed(2):'');
+  if(buy===null) return;
+  const sh=prompt('株数（任意・空欄可）','');
+  const bv=parseFloat(buy), sv=parseFloat((sh||'').replace(/[, ]/g,''));
+  const p=getPortfolio().filter(h=>h.sym!==sym);
+  p.push({sym, buy:isFinite(bv)?bv:null, shares:isFinite(sv)?sv:null});
+  savePortfolio(p); renderPortfolio();
+  document.getElementById('portcard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+// 判定中の銘柄をウォッチリストへ（導線）
+function addCurrentToWatch(){
+  if(!lastSym){ alert('先に銘柄を判定してください。'); return; }
+  const wl=document.getElementById('wl'); const cur=(wl.value||'').trim();
+  const set=new Set(cur.split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean));
+  if(set.has(lastSym)){ alert(`${lastSym} は既にウォッチリストにあります。`); return; }
+  wl.value=(cur?cur+' ':'')+lastSym; try{ localStorage.setItem('wl',wl.value); }catch(e){}
+  document.getElementById('screencard').scrollIntoView({behavior:'smooth',block:'start'});
+}
 function renderPortfolio(){
   const p=getPortfolio();
   const tbl=document.getElementById('pf-table'), body=document.getElementById('pf-body'), empty=document.getElementById('pf-empty');
@@ -2015,7 +2064,7 @@ function renderThemes(){
   renderBreakout();
   const anyData=Object.keys(themeData).some(s=>themeData[s]&&!themeData[s].err);
   if(!anyData){ box.innerHTML='<div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div>'; return; }
-  const pLab={1:'1日',5:'1週',21:'1ヶ月',63:'3ヶ月',126:'6ヶ月'}[themePeriod]||'';
+  const pLab=GPLABS[themePeriod]||`${themePeriod}本`;
   __themeRows=THEMES.map(t=>{
     const ds=t.syms.map(s=>themeData[s]).filter(d=>d&&!d.err);
     const avgOf=fn=>{ const a=ds.map(fn).filter(x=>x!=null); return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; };
@@ -2369,12 +2418,25 @@ document.getElementById('screen').addEventListener('click',screen);
 document.getElementById('csv').addEventListener('click',exportCSV);
 document.getElementById('pf-add').addEventListener('click',addHolding);
 document.getElementById('pf-refresh').addEventListener('click',refreshPortfolio);
-document.getElementById('ch-range').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
-  chartBars=+b.dataset.b; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); drawMiniChart(); });
 let _chRz; window.addEventListener('resize',()=>{ clearTimeout(_chRz); _chRz=setTimeout(()=>{ if(lastData) drawMiniChart(); },200); });
 document.getElementById('th-run').addEventListener('click',runThemes);
-document.getElementById('th-period').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
-  themePeriod=+b.dataset.b; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderThemes(); });
+document.getElementById('add-pf').addEventListener('click',addCurrentToPortfolio);
+document.getElementById('add-wl').addEventListener('click',addCurrentToWatch);
+// 共通の期間セレクタ（テーマ一覧＋チャートに連動）
+function setGlobalPeriod(b){
+  gPeriod=b; themePeriod=b; chartBars=b; try{ localStorage.setItem('gperiod',b); }catch(e){}
+  document.querySelectorAll('#global-period button').forEach(x=>x.classList.toggle('on',+x.dataset.b===b));
+  if(Object.keys(themeData).length) renderThemes();
+  if(lastData) drawMiniChart();
+}
+document.getElementById('global-period').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; setGlobalPeriod(+b.dataset.b); });
+// セクション・タブ（スクロール連動）
+document.getElementById('navtabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  const el=document.getElementById(b.dataset.t); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); });
+(function(){ const tabs=[...document.querySelectorAll('#navtabs button')];
+  try{ const io=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){ tabs.forEach(t=>t.classList.toggle('on',t.dataset.t===en.target.id)); } }); },{rootMargin:'-45% 0px -50% 0px'});
+    ['result','themecard','screencard','portcard'].forEach(id=>{ const el=document.getElementById(id); if(el) io.observe(el); });
+  }catch(e){} })();
 document.getElementById('th-ma').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
   breakMA=+b.dataset.m; [...e.currentTarget.children].forEach(c=>c.classList.toggle('on',c===b)); renderBreakout(); });
 document.getElementById('th-dir').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
@@ -2450,6 +2512,9 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   loadPfResults();
   renderPortfolio();
   if(Object.keys(pfLast).length && pfTs){ const ps=document.getElementById('pf-status'); if(ps) ps.textContent=`前回データ表示中（取得: ${fmtTs(pfTs)}）。更新は「📊一括更新」を押す`; }
+  // 共通の期間を復元（テーマ一覧＋チャート連動）
+  try{ const gp=parseInt(localStorage.getItem('gperiod'),10); if(GPLABS[gp]){ gPeriod=gp; themePeriod=gp; chartBars=gp; } }catch(e){}
+  document.querySelectorAll('#global-period button').forEach(x=>x.classList.toggle('on',+x.dataset.b===gPeriod));
   // テーマ・トラッカー：前回取得データを復元（再取得は確認後のみ）
   loadThemeCache();
   if(Object.keys(themeData).length){ renderThemes();
