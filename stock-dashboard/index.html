@@ -69,7 +69,7 @@ button.btn{background:linear-gradient(135deg,var(--ac),var(--teal));color:#00110
 button.btn.alt{background:var(--sf2);color:var(--tx);border:1px solid var(--bd)}
 button.btn:active{transform:translateY(1px)}
 .card{background:rgba(23,32,51,.9);border:1px solid var(--bd);border-radius:16px;padding:14px;margin:14px 0}
-.card h2{font-size:14px;margin:0 0 10px;color:var(--ac);font-weight:900;letter-spacing:.02em}
+.card h2{font-size:14px;margin:0 0 10px;color:var(--ac);font-weight:900;letter-spacing:.02em;padding-left:9px;border-left:3px solid var(--ac);line-height:1.25}
 .muted{color:var(--muted)}
 .small{font-size:12px}
 .tiny{font-size:11px}
@@ -184,6 +184,19 @@ a{color:var(--ac)}
 .bkpill{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer}
 .bkpill.sel{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
 #th-bklist a{color:var(--ac);font-weight:900;text-decoration:none;margin-right:2px}
+.scsort{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.scsort button{flex:none;background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:11px;padding:5px 10px;min-height:31px;cursor:pointer}
+.scsort button.on{background:var(--ac);color:#04210f;border-color:var(--ac)}
+.scard{display:flex;align-items:center;gap:9px;padding:9px 4px 9px 7px;border-bottom:1px solid var(--soft);border-left:3px solid var(--bd);cursor:pointer}
+.scard.buy{border-left-color:#22c55e}.scard.tp,.scard.hold{border-left-color:#f59e0b}.scard.wait{border-left-color:#ef4444}.scard.bad{border-left-color:#475569;opacity:.7}
+.sc-score{flex:none;width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;background:var(--sf2);border:1px solid var(--bd)}
+.sc-score.pos{color:var(--ok);border-color:rgba(34,197,94,.4)}.sc-score.warn{color:var(--wait)}
+.sc-main{flex:1;min-width:0}
+.sc-name{font-weight:900;font-size:14px}
+.sc-name .co{color:var(--muted);font-weight:700;font-size:11px;margin-left:5px}
+.sc-meta{font-size:10.5px;color:var(--muted);font-weight:700;margin-top:3px;display:flex;flex-wrap:wrap;gap:3px 7px;align-items:center}
+.sc-right{flex:none;text-align:right}
+.sc-del{flex:none;color:var(--muted);font-weight:900;text-decoration:none;padding:4px 6px;font-size:15px}
 .bkchip{display:inline-block;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:5px 10px;margin:4px 5px 0 0;font-weight:700;cursor:pointer;min-height:32px}
 .bkchip b{color:var(--ac)}
 .bkchip:active{border-color:var(--ac)}
@@ -297,7 +310,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
       <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
       <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-      <div class="hs" style="text-align:right">v47<br><span id="build" style="font-weight:700"></span></div>
+      <div class="hs" style="text-align:right">v48<br><span id="build" style="font-weight:700"></span></div>
     </div>
   </div>
   <div class="navbar">
@@ -406,13 +419,13 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button id="csv" class="btn alt" style="display:none">CSV出力</button>
       <span class="tiny muted" id="scr-status"></span>
     </div>
-    <div class="scrwrap"><table class="scrn" id="scrn" style="display:none">
-      <thead><tr>
-        <th data-k="score">★</th><th data-k="sym">銘柄</th><th data-k="action">行動</th><th data-k="ttPass">条件</th>
-        <th data-k="rs">RS</th><th data-k="gain">21EMA乖離</th><th data-k="close">終値</th>
-      </tr></thead>
-      <tbody id="scrn-body"></tbody>
-    </table></div>
+    <div id="scrn" style="display:none">
+      <div class="scsort" id="scsort">
+        <span class="navplabel">並び</span>
+        <button data-k="score" class="on">★スコア</button><button data-k="rs">RS</button><button data-k="ttPass">条件</button><button data-k="gain">乖離</button><button data-k="sym">銘柄</button>
+      </div>
+      <div id="scrn-body"></div>
+    </div>
   </div>
 
   <!-- テーマ・トラッカー -->
@@ -454,10 +467,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button id="pf-refresh" class="btn">📊 一括更新</button>
       <span class="tiny muted" id="pf-status"></span>
     </div>
-    <div class="scrwrap"><table class="scrn" id="pf-table" style="display:none">
-      <thead><tr><th>銘柄</th><th>取得</th><th>現値</th><th>損益</th><th>判定</th><th>損切り</th><th></th></tr></thead>
-      <tbody id="pf-body"></tbody>
-    </table></div>
+    <div id="pf-table" style="display:none"><div id="pf-body"></div></div>
     <div class="tiny muted" id="pf-empty" style="margin-top:8px">まだ登録がありません。上で銘柄と取得単価を入れて「＋追加」してください。</div>
   </div>
 
@@ -1750,7 +1760,7 @@ async function screen(){
 }
 function actClass(a){ return a.indexOf('買い候補')===0?'buy':a==='利確検討'?'tp':a==='様子見'?'wait':'hold'; }
 function renderScreen(){
-  const tb=document.getElementById('scrn-body'); document.getElementById('scrn').style.display='table';
+  const body=document.getElementById('scrn-body'); document.getElementById('scrn').style.display='block';
   const rows=scrnRows.slice().sort((a,b)=>{
     if(a.ok!==b.ok) return a.ok?-1:1;
     const k=scrnSort.k; let x=a[k],y=b[k];
@@ -1758,25 +1768,19 @@ function renderScreen(){
     x=(x==null||isNaN(x))?-Infinity:x; y=(y==null||isNaN(y))?-Infinity:y;
     return scrnSort.dir*(x-y);
   });
-  tb.innerHTML='';
-  rows.forEach(r=>{
-    const tr=document.createElement('tr');
-    if(!r.ok){ tr.className='bad'; tr.innerHTML=`<td colspan="2" class="sym">${r.sym}</td><td colspan="5" style="text-align:left">取得失敗: ${r.err}</td>`; tb.appendChild(tr); return; }
-    const sc=r.score!=null?r.score:0;
-    const scCls=sc>=80?'pos':sc>=60?'':'warn';
-    tr.innerHTML=
-      `<td class="b ${scCls}">${sc}</td>`+
-      `<td class="sym">${r.nearBreakout?'🔥':''}<a href="#" data-sym="${r.sym}" class="jump">${r.sym}</a></td>`+
-      `<td><span class="act ${actClass(r.action)}">${r.action}</span></td>`+
-      `<td class="b">${r.ttPass}/${r.ttEval}</td>`+
-      `<td class="b ${r.rs>=70?'pos':(r.rs!=null?'warn':'')}">${r.rs!=null?r.rs:'—'}</td>`+
-      `<td class="${r.gain>CONFIG.gainFromMA_hot?'warn':''}">${pct(r.gain)}</td>`+
-      `<td>${fmt(r.close)}</td>`;
-    tb.appendChild(tr);
-  });
-  tb.querySelectorAll('a.jump').forEach(a=>a.addEventListener('click',e=>{
-    e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run();
-  }));
+  body.innerHTML=rows.map(r=>{
+    if(!r.ok) return `<div class="scard bad"><span class="sc-score warn">×</span><div class="sc-main"><div class="sc-name">${r.sym}</div><div class="sc-meta">取得失敗: ${r.err}</div></div></div>`;
+    const sc=r.score!=null?r.score:0, scCls=sc>=80?'pos':sc>=60?'':'warn';
+    const rsCls=r.rs>=70?'pos':(r.rs!=null?'warn':''), gnCls=r.gain>CONFIG.gainFromMA_hot?'warn':'';
+    return `<div class="scard ${actClass(r.action)}" data-sym="${r.sym}">`+
+      `<span class="sc-score ${scCls}">${sc}</span>`+
+      `<div class="sc-main"><div class="sc-name">${r.nearBreakout?'🔥':''}${r.sym}<span class="co">${NAMES[r.sym]||''}</span></div>`+
+      `<div class="sc-meta"><span class="act ${actClass(r.action)}">${r.action}</span>`+
+      `<span>条件 ${r.ttPass}/${r.ttEval}</span>・<span class="${rsCls}">RS ${r.rs!=null?r.rs:'—'}</span>`+
+      `・<span class="${gnCls}">乖離 ${pct(r.gain)}</span>・<span>終値 ${fmt(r.close)}</span></div></div></div>`;
+  }).join('');
+  body.querySelectorAll('.scard[data-sym]').forEach(c=>c.addEventListener('click',()=>{ document.getElementById('symbol').value=c.dataset.sym; run(); }));
+  document.querySelectorAll('#scsort button').forEach(b=>b.classList.toggle('on',b.dataset.k===scrnSort.k));
 }
 
 /* ===== 保有管理（ポートフォリオ） ===== */
@@ -1827,31 +1831,27 @@ function renderPortfolio(){
   const p=getPortfolio();
   const tbl=document.getElementById('pf-table'), body=document.getElementById('pf-body'), empty=document.getElementById('pf-empty');
   if(!p.length){ tbl.style.display='none'; empty.style.display='block'; return; }
-  empty.style.display='none'; tbl.style.display='table'; body.innerHTML='';
-  p.forEach(h=>{
-    const ev=pfLast[h.sym]; const tr=document.createElement('tr'); const del=`<td><a href="#" class="pdel" data-sym="${h.sym}">✕</a></td>`;
-    if(!ev){
-      tr.innerHTML=`<td class="sym"><a href="#" data-sym="${h.sym}" class="pjump">${h.sym}</a></td>`+
-        `<td>${h.buy!=null?fmt(h.buy):'—'}</td><td>—</td><td>—</td><td><span class="tiny muted">未更新</span></td><td>—</td>`+del;
-    } else if(ev.err){
-      tr.className='bad';
-      tr.innerHTML=`<td class="sym"><a href="#" data-sym="${h.sym}" class="pjump">${h.sym}</a></td><td colspan="5" style="text-align:left">取得失敗: ${ev.err}</td>`+del;
-    } else {
-      const plPct = h.buy!=null? (ev.close/h.buy-1)*100 : null;
-      const plCls = plPct==null?'':plPct>=0?'pos':'neg';
-      const plAmt = (h.buy!=null && h.shares!=null)? (ev.close-h.buy)*h.shares : null;
-      const sa=ev.sellAction, stopHit = ev.stop!=null && ev.close<ev.stop;
-      tr.innerHTML=`<td class="sym"><a href="#" data-sym="${h.sym}" class="pjump">${h.sym}</a></td>`+
-        `<td>${h.buy!=null?fmt(h.buy):'—'}</td>`+
-        `<td>${fmt(ev.close)}</td>`+
-        `<td class="b ${plCls}">${plPct==null?'—':(plPct>=0?'+':'')+plPct.toFixed(1)+'%'}${plAmt!=null?`<br><span class="tiny muted">${plAmt>=0?'+':''}${fmt(plAmt,0)}</span>`:''}</td>`+
-        `<td><span class="act ${sellActClass(sa)}">${sa}</span></td>`+
-        `<td class="${stopHit?'neg':''}">${ev.stop!=null?fmt(ev.stop):'—'}${stopHit?' ⚠️':''}</td>`+del;
-    }
-    body.appendChild(tr);
-  });
-  body.querySelectorAll('a.pjump').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); document.getElementById('symbol').value=a.dataset.sym; run(); }));
-  body.querySelectorAll('a.pdel').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); removeHolding(a.dataset.sym); }));
+  empty.style.display='none'; tbl.style.display='block';
+  body.innerHTML=p.map(h=>{
+    const ev=pfLast[h.sym], del=`<a href="#" class="sc-del pdel" data-sym="${h.sym}">✕</a>`;
+    const nm=`${h.sym}<span class="co">${NAMES[h.sym]||''}</span>`;
+    if(!ev) return `<div class="scard" data-sym="${h.sym}"><span class="sc-score">—</span><div class="sc-main"><div class="sc-name">${nm}</div>`+
+      `<div class="sc-meta">取得 ${h.buy!=null?fmt(h.buy):'—'}・<span class="muted">未更新（一括更新で評価）</span></div></div>${del}</div>`;
+    if(ev.err) return `<div class="scard bad" data-sym="${h.sym}"><span class="sc-score warn">×</span><div class="sc-main"><div class="sc-name">${nm}</div>`+
+      `<div class="sc-meta">取得失敗: ${ev.err}</div></div>${del}</div>`;
+    const plPct=h.buy!=null?(ev.close/h.buy-1)*100:null, plCls=plPct==null?'muted':plPct>=0?'pos':'neg';
+    const plAmt=(h.buy!=null&&h.shares!=null)?(ev.close-h.buy)*h.shares:null;
+    const sa=ev.sellAction, stopHit=ev.stop!=null&&ev.close<ev.stop, scCls=sellActClass(sa);
+    return `<div class="scard ${scCls}" data-sym="${h.sym}">`+
+      `<span class="sc-score ${plCls==='pos'?'pos':plCls==='neg'?'warn':''}" style="font-size:12px">${plPct==null?'—':(plPct>=0?'+':'')+plPct.toFixed(0)+'%'}</span>`+
+      `<div class="sc-main"><div class="sc-name">${nm}</div>`+
+      `<div class="sc-meta"><span class="act ${scCls}">${sa}</span>`+
+      `<span>取得 ${h.buy!=null?fmt(h.buy):'—'}</span>・<span>現値 ${fmt(ev.close)}</span>`+
+      `${plAmt!=null?`・<span class="${plCls}">${plAmt>=0?'+':''}${fmt(plAmt,0)}</span>`:''}`+
+      `・<span class="${stopHit?'neg':''}">損切り ${ev.stop!=null?fmt(ev.stop):'—'}${stopHit?' ⚠️':''}</span></div></div>${del}</div>`;
+  }).join('');
+  body.querySelectorAll('.scard[data-sym]').forEach(c=>c.addEventListener('click',e=>{ if(e.target.closest('.pdel'))return; document.getElementById('symbol').value=c.dataset.sym; run(); }));
+  body.querySelectorAll('a.pdel').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); removeHolding(a.dataset.sym); }));
 }
 async function refreshPortfolio(){
   const source=document.getElementById('source').value;
@@ -2458,11 +2458,11 @@ function readStop(){ const o={stopBasis:document.getElementById('stopbasis').val
 // スコア配分
 function readScoreW(){ const o={rs:Math.max(0,parseFloat(document.getElementById('sw-rs').value)||0), tt:Math.max(0,parseFloat(document.getElementById('sw-tt').value)||0), setup:Math.max(0,parseFloat(document.getElementById('sw-setup').value)||0)}; if(o.rs+o.tt+o.setup<=0){o.rs=35;o.tt=25;o.setup=40;} applyScoreW(o); localStorage.setItem('scoreW',JSON.stringify(o)); }
 ['sw-rs','sw-tt','sw-setup'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ readScoreW(); reJudge(); reScreen(); }));
-document.querySelectorAll('#scrn th[data-k]').forEach(th=>th.addEventListener('click',()=>{
-  const k=th.dataset.k;
+document.getElementById('scsort').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  const k=b.dataset.k;
   if(scrnSort.k===k) scrnSort.dir*=-1; else scrnSort={k, dir:(k==='sym'?1:-1)};
-  renderScreen();
-}));
+  renderScreen(); saveScreen();
+});
 // 入力した瞬間にキーを保存（このブラウザのみ）。次回以降は自動復元。
 document.getElementById('tdkey').addEventListener('input',e=>{
   const v=e.target.value.trim(); if(v) localStorage.setItem('td_key',v);
