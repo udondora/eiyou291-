@@ -275,7 +275,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v43<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v44<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -618,11 +618,13 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <h2>📈 価格チャート（MA・出来高・RSI）</h2>
       <div class="chhead">
         <div class="chtitle"><span id="ch-sym">—</span> <span class="muted" id="ch-name"></span></div>
-        <div class="chstats"><span id="ch-period" class="pos"></span> ・ <span id="ch-day"></span> <span class="muted" id="ch-asof" style="font-weight:700"></span></div>
+        <div class="chstats"><span id="ch-period" class="pos"></span> <span id="ch-day"></span> <span class="muted" id="ch-asof" style="font-weight:700"></span></div>
       </div>
+      <div class="tiny muted" style="margin-top:2px">期間ボタン＝表示する騰落率を選択（チャートは最低3ヶ月の日足）</div>
       <div class="segbtns" id="ch-range" style="margin:8px 0 4px;flex-wrap:wrap">
-        <button data-b="1">1日</button><button data-b="5">5日</button><button data-b="10">10日</button><button data-b="21">1ヶ月</button><button data-b="63">3ヶ月</button><button data-b="126" class="on">6ヶ月</button><button data-b="252">1年</button>
+        <button data-b="1">1日</button><button data-b="5">5日</button><button data-b="10">10日</button><button data-b="21">1ヶ月</button><button data-b="42">2ヶ月</button><button data-b="63" class="on">3ヶ月</button><button data-b="126">6ヶ月</button><button data-b="252">12ヶ月</button>
       </div>
+      <div class="tiny muted" id="ch-rangelabel" style="margin:2px 0 4px;font-weight:800;color:var(--tx)"></div>
       <canvas id="ch-canvas" style="width:100%;height:340px"></canvas>
       <div class="chlegend tiny" id="ch-legend"></div>
       <div class="tiny muted" id="ch-rsi" style="margin-top:2px"></div>
@@ -1460,7 +1462,7 @@ async function loadOptions(dateTs){
 
 
 /* ===== 自前の価格チャート（ローソク足＋MA＋出来高＋RSI） ===== */
-let chartBars=126;
+let chartBars=63;
 const MA_DEFS=[{len:20,c:'#a78bfa'},{len:50,c:'#60a5fa'},{len:75,c:'#22d3ee'},{len:100,c:'#4ade80'},{len:150,c:'#eab308'},{len:200,c:'#f472b6'}];
 function smaSeries(arr,len){ const out=Array(arr.length).fill(null); let s=0; for(let i=0;i<arr.length;i++){ s+=arr[i]; if(i>=len) s-=arr[i-len]; if(i>=len-1) out[i]=s/len; } return out; }
 function rsiSeries(close,len){ const out=Array(close.length).fill(null); let g=0,l=0;
@@ -1470,15 +1472,22 @@ function rsiSeries(close,len){ const out=Array(close.length).fill(null); let g=0
   return out; }
 function drawMiniChart(){
   const d=lastData, cv=document.getElementById('ch-canvas'); if(!d||!cv||!d.close) return;
-  const n=d.close.length, bars=Math.min(chartBars,n), i0=n-bars; if(bars<1) return;
-  const base=Math.max(0,n-1-bars);   // bars本前の終値を起点に騰落率
-  const pchg=(d.close[n-1]/d.close[base]-1)*100, dchg=n>=2?(d.close[n-1]/d.close[n-2]-1)*100:0;
-  const pLab={1:'1日',5:'5日',10:'10日',21:'1ヶ月',63:'3ヶ月',126:'半年',252:'1年'}[chartBars]||`${chartBars}本`;
+  const n=d.close.length; if(n<2) return;
+  // chartBars＝選択した「騰落率の期間」。チャートの表示範囲は最低3ヶ月(63本)で、長い期間を選ぶと伸びる
+  const periodBars=Math.min(chartBars, n-1);
+  const bars=Math.min(Math.max(chartBars,63), n), i0=n-bars; if(bars<2) return;
+  const pchg=(d.close[n-1]/d.close[n-1-periodBars]-1)*100, dchg=(d.close[n-1]/d.close[n-2]-1)*100;
+  const PLABS={1:'1日',5:'5日',10:'10日',21:'1ヶ月',42:'2ヶ月',63:'3ヶ月',126:'6ヶ月',252:'12ヶ月'};
+  const pLab=PLABS[chartBars]||`${chartBars}本`;
+  const sg=v=>(v>=0?'+':'')+v.toFixed(1)+'%';
   document.getElementById('ch-sym').textContent=lastSym||'';
   document.getElementById('ch-name').textContent=NAMES[lastSym]||'';
-  const se=document.getElementById('ch-period'); se.textContent=`${pLab} ${pchg>=0?'+':''}${pchg.toFixed(1)}%`; se.className=pchg>=0?'pos':'neg';
-  const de=document.getElementById('ch-day'); de.textContent=`1日 ${dchg>=0?'+':''}${dchg.toFixed(1)}%`; de.className=dchg>=0?'pos':'neg';
+  const se=document.getElementById('ch-period'); se.textContent=`${pLab} ${sg(pchg)}`; se.className=pchg>=0?'pos':'neg';
+  const de=document.getElementById('ch-day');
+  if(chartBars===1){ de.textContent=''; } else { de.textContent=`・ 1日 ${sg(dchg)}`; de.className=dchg>=0?'pos':'neg'; }
   document.getElementById('ch-asof').textContent=(d.time&&d.time[n-1])?`終値: ${d.time[n-1]}`:'';
+  const dispM=bars>=252?'12ヶ月':bars>=126?'6ヶ月':'3ヶ月';
+  const rl=document.getElementById('ch-rangelabel'); if(rl) rl.textContent=`${dispM} 日足`;
   const cssW=cv.clientWidth||cv.parentElement.clientWidth||320, cssH=340, dpr=window.devicePixelRatio||1;
   cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
   const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cssW,cssH);
