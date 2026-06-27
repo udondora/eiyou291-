@@ -187,17 +187,23 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
 .segbtns{display:inline-flex;gap:4px}
 .segbtns button{background:var(--sf2);border:1px solid var(--bd);color:var(--muted);border-radius:8px;font-weight:800;font-size:12px;padding:6px 10px;min-height:34px;cursor:pointer}
 .segbtns button.on{background:var(--ac);color:#00110e;border-color:var(--ac)}
-.thcard{padding:10px 2px;border-bottom:1px solid var(--soft);cursor:pointer}
-.thtop{display:flex;align-items:center;gap:9px}
-.thrank{font-weight:900;color:#00110e;background:var(--ac);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
+.thhdr{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);font-weight:800;padding:2px 2px 6px}
+.thh-spark{width:96px;text-align:center;flex:none}
+.thh-chg{width:70px;text-align:right;flex:none}
+.thcard{padding:11px 2px 11px 8px;border-bottom:1px solid var(--soft);border-left:3px solid #22c55e;cursor:pointer}
+.thtop{display:flex;align-items:center;gap:8px}
+.thrank{font-weight:900;color:#04210f;background:#22c55e;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
 .thnamewrap{flex:1;min-width:0}
-.thname{font-weight:900;font-size:14px}
-.thmeta{font-size:10.5px;color:var(--muted);font-weight:700;margin-top:2px;line-height:1.3}
-.thbigwrap{text-align:right;flex:none}
-.thbig{font-size:17px;font-weight:900;line-height:1}
-.thday{font-size:10.5px;font-weight:800;margin-top:2px}
-.thsparkwrap{margin-top:6px;line-height:0}
-.thrange{display:block;font-size:10px;color:var(--muted);font-weight:700;margin-top:3px;line-height:1.2}
+.thname{font-weight:900;font-size:14px;line-height:1.2}
+.thcat{display:inline-block;margin-top:4px;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;color:#fff;line-height:1.3}
+.thmeta{font-size:9.5px;color:var(--muted);font-weight:700;margin-top:3px;line-height:1.3}
+.thspark{position:relative;width:96px;height:38px;flex:none;line-height:0}
+.spk-hi,.spk-lo{position:absolute;left:1px;font-size:8.5px;color:#93a4bb;font-weight:700;line-height:1}
+.spk-hi{top:0}.spk-lo{bottom:1px}
+.thright{flex:none;text-align:right;width:70px}
+.thbig{font-size:18px;font-weight:900;line-height:1}
+.thday{font-size:10px;font-weight:800;margin-top:2px}
+.thvol{font-size:9px;color:var(--muted);font-weight:700;margin-top:3px}
 .thdetail{padding:4px 4px 12px 30px}
 .thpill{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--soft);font-size:12.5px;font-weight:700}
 .thpill .thnm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -275,7 +281,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v44<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v45<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -387,7 +393,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <div class="row" style="margin-top:8px">
         <button id="th-run" class="btn">📊 テーマ分析</button>
         <div class="segbtns" id="th-period">
-          <button data-b="1">1日</button><button data-b="5">1週</button><button data-b="21" class="on">1ヶ月</button><button data-b="63">3ヶ月</button><button data-b="126">6ヶ月</button>
+          <button data-b="1">1日</button><button data-b="5">1週</button><button data-b="21">1ヶ月</button><button data-b="63" class="on">3ヶ月</button><button data-b="126">6ヶ月</button>
         </div>
         <span class="tiny muted" id="th-status"></span>
       </div>
@@ -1837,16 +1843,16 @@ async function refreshPortfolio(){
 
 /* ===== テーマ・トラッカー ===== */
 const THEMES=[
-  {name:'AI半導体', syms:['NVDA','AMD','AVGO','MRVL','TSM']},
-  {name:'半導体製造装置', syms:['AMAT','LRCX','KLAC','ASML','TSEM']},
-  {name:'メモリ/ストレージ', syms:['MU','STX','WDC','SNDK','NTAP']},
-  {name:'光通信/ネットワーク', syms:['COHR','LITE','AAOI','CIEN','ANET']},
-  {name:'AIインフラ/データセンター', syms:['VRT','NBIS','CRWV','SMCI','DELL']},
-  {name:'クラウド/AIソフト', syms:['PLTR','NET','MSFT','GOOGL','META']},
-  {name:'電力/原子力', syms:['VST','CEG','GEV','OKLO','SMR']},
-  {name:'燃料電池/クリーンエネ', syms:['BE','PLUG','FSLR','ENPH']},
-  {name:'宇宙/防衛', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
-  {name:'量子コンピュータ', syms:['IONQ','RGTI','QBTS','QUBT']},
+  {name:'AI半導体', cat:'半導体', catc:'#ec4899', syms:['NVDA','AMD','AVGO','MRVL','TSM']},
+  {name:'半導体製造装置', cat:'半導体製造', catc:'#ec4899', syms:['AMAT','LRCX','KLAC','ASML','TSEM']},
+  {name:'メモリ/ストレージ', cat:'ハードウェア', catc:'#ec4899', syms:['MU','STX','WDC','SNDK','NTAP']},
+  {name:'光通信/ネットワーク', cat:'通信機器', catc:'#ec4899', syms:['COHR','LITE','AAOI','CIEN','ANET']},
+  {name:'AIインフラ/データセンター', cat:'AIインフラ', catc:'#ec4899', syms:['VRT','NBIS','CRWV','SMCI','DELL']},
+  {name:'クラウド/AIソフト', cat:'ソフトウェア', catc:'#3b82f6', syms:['PLTR','NET','MSFT','GOOGL','META']},
+  {name:'電力/原子力', cat:'電力・エネルギー', catc:'#10b981', syms:['VST','CEG','GEV','OKLO','SMR']},
+  {name:'燃料電池/クリーンエネ', cat:'クリーンエネ', catc:'#10b981', syms:['BE','PLUG','FSLR','ENPH']},
+  {name:'宇宙/防衛', cat:'宇宙・防衛', catc:'#6366f1', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
+  {name:'量子コンピュータ', cat:'量子', catc:'#a855f7', syms:['IONQ','RGTI','QBTS','QUBT']},
 ];
 const NAMES={NVDA:'エヌビディア',AMD:'AMD',AVGO:'ブロードコム',MRVL:'マーベル',TSM:'TSMC',
   AMAT:'アプライド',LRCX:'ラムリサーチ',KLAC:'KLA',ASML:'ASML',TSEM:'タワーセミ',
@@ -1859,7 +1865,7 @@ const NAMES={NVDA:'エヌビディア',AMD:'AMD',AVGO:'ブロードコム',MRVL:
   RKLB:'ロケットラボ',ASTS:'AST',LMT:'ロッキード',KTOS:'クラトス',AVAV:'エアロバイロメント',
   IONQ:'アイオンキュー',RGTI:'リゲッティ',QBTS:'Dウェーブ',QUBT:'クオンタム'};
 let themeData={};     // sym -> 取得した series d（または {err}）
-let themePeriod=21;   // 騰落率の計算バー数
+let themePeriod=63;   // 騰落率の計算バー数（既定3ヶ月）
 let __themeRows=[];
 let themeCacheTs=null;
 const THCACHE_KEY='themeCache';
@@ -1894,8 +1900,10 @@ function themeSparkRich(ds,L){
   const line=avg.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
   const up=avg[avg.length-1]>=avg[0], col=up?'#22c55e':'#ef4444', fill=up?'rgba(34,197,94,.13)':'rgba(239,68,68,.13)';
   const lx=X(avg.length-1).toFixed(1), ly=Y(avg[avg.length-1]).toFixed(1);
+  const yBase=Y(Math.min(mx,Math.max(mn,100))).toFixed(1);   // 起点(0%)の基準線
   const svg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="40">`+
     `<polygon points="0,${H} ${line} ${W},${H}" fill="${fill}" stroke="none"/>`+
+    `<line x1="0" y1="${yBase}" x2="${W}" y2="${yBase}" stroke="rgba(255,255,255,.25)" stroke-width="1" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>`+
     `<polyline points="${line}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`+
     `<circle cx="${lx}" cy="${ly}" r="2.6" fill="${col}"/></svg>`;
   return {svg, maxPct:mx-100, minPct:mn-100};
@@ -2010,22 +2018,23 @@ function renderThemes(){
     const avgOf=fn=>{ const a=ds.map(fn).filter(x=>x!=null); return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; };
     return {t, ds, n:ds.length, total:t.syms.length,
       avg:avgOf(d=>chgOf(d,themePeriod)), day:avgOf(d=>chgOf(d,1)), volc:avgOf(volChgOf),
-      aboveN:ds.filter(aboveMA20).length, hotN:ds.filter(near52h).length, spark:themeSparkRich(ds,126)};
+      aboveN:ds.filter(aboveMA20).length, hotN:ds.filter(near52h).length, spark:themeSparkRich(ds,252)};
   }).sort((a,b)=>(b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg));
-  const sg=(v,d=1)=>v==null?'—':(v>=0?'+':'')+v.toFixed(d)+'%';
+  const sg=(v,dg=1)=>v==null?'—':(v>=0?'+':'')+v.toFixed(dg)+'%';
   const cl=v=>v==null?'muted':v>=0?'pos':'neg';
-  box.innerHTML=`<div class="tiny muted" style="margin:2px 0 6px">TOP（${pLab}騰落率順）・行タップで構成銘柄</div>`+__themeRows.map((r,idx)=>{
+  box.innerHTML=`<div class="thhdr"><span style="flex:1"></span><span class="thh-spark">1年間推移</span><span class="thh-chg">${pLab}騰落率</span></div>`+__themeRows.map((r,idx)=>{
     const volTxt=r.volc==null?'—':(r.volc>=0?'+':'')+r.volc.toFixed(0)+'%';
-    const rangeTxt=r.spark?`推移(直近6ヶ月) <span class="pos">+${r.spark.maxPct.toFixed(0)}%</span> / <span class="neg">${r.spark.minPct.toFixed(0)}%</span>`:'';
+    const spk=r.spark? `${r.spark.svg}<span class="spk-hi">+${r.spark.maxPct.toFixed(0)}%</span><span class="spk-lo">${r.spark.minPct>=0?'+':''}${r.spark.minPct.toFixed(0)}%</span>` : '';
     return `<div class="thcard" data-i="${idx}">`+
       `<div class="thtop">`+
         `<span class="thrank">${idx+1}</span>`+
         `<div class="thnamewrap"><div class="thname">${r.t.name}</div>`+
-        `<div class="thmeta">20日線上 ${r.aboveN}/${r.n} ・ 🔥${r.hotN} ・ 出来高 ${volTxt}</div></div>`+
-        `<div class="thbigwrap"><div class="thbig ${cl(r.avg)}">${sg(r.avg)}</div>`+
-        `<div class="thday ${cl(r.day)}">1日 ${sg(r.day)}</div></div>`+
-      `</div>`+
-      `<div class="thsparkwrap">${r.spark?r.spark.svg:''}<span class="thrange">${rangeTxt}</span></div>`+
+        (r.t.cat?`<span class="thcat" style="background:${r.t.catc||'#64748b'}">${r.t.cat}</span>`:'')+
+        `<div class="thmeta">20日上 ${r.aboveN}/${r.n} ・ 🔥${r.hotN}</div></div>`+
+        `<div class="thspark">${spk}</div>`+
+        `<div class="thright"><div class="thbig ${cl(r.avg)}">${sg(r.avg,0)}</div>`+
+        `<div class="thday ${cl(r.day)}">1日 ${sg(r.day)}</div>`+
+        `<div class="thvol">出来高 ${volTxt}</div></div>`+
       `</div>`+
       `<div class="thdetail" id="thd-${idx}" style="display:none"></div>`;
   }).join('');
