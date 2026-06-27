@@ -2,10 +2,11 @@
    - アプリ本体（単一HTML）・アイコン・manifest をキャッシュしてオフライン動作。
    - 学習の進捗記録は localStorage に保存（このSWは触らない）。
    - 新バージョンは「待機」し、ページ上の「更新」操作でのみ切り替える。 */
-const CACHE = 'eiyou291-v26';
+const CACHE = 'eiyou291-v27';
 const ASSETS = [
   './',
-  './eiyou291_v26.html',
+  './index.html',
+  './eiyou291_v27.html',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-192.png',
@@ -41,6 +42,6 @@ self.addEventListener('fetch', e => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return res;
-    }).catch(() => caches.match(e.request).then(r => r || caches.match('./eiyou291_v26.html')))
+    }).catch(() => caches.match(e.request).then(r => r || caches.match('./eiyou291_v27.html')))
   );
 });
