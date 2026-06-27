@@ -275,7 +275,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
     <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
     <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
     <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-    <div class="hs" style="text-align:right">v42<br><span id="build" style="font-weight:700"></span></div>
+    <div class="hs" style="text-align:right">v43<br><span id="build" style="font-weight:700"></span></div>
   </div>
 </div>
 <div id="updbar">🆕 新しいバージョンがあります — タップして更新</div>
@@ -620,8 +620,8 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
         <div class="chtitle"><span id="ch-sym">—</span> <span class="muted" id="ch-name"></span></div>
         <div class="chstats"><span id="ch-period" class="pos"></span> ・ <span id="ch-day"></span> <span class="muted" id="ch-asof" style="font-weight:700"></span></div>
       </div>
-      <div class="segbtns" id="ch-range" style="margin:8px 0 4px">
-        <button data-b="21">1ヶ月</button><button data-b="63">3ヶ月</button><button data-b="126" class="on">6ヶ月</button><button data-b="252">1年</button>
+      <div class="segbtns" id="ch-range" style="margin:8px 0 4px;flex-wrap:wrap">
+        <button data-b="1">1日</button><button data-b="5">5日</button><button data-b="10">10日</button><button data-b="21">1ヶ月</button><button data-b="63">3ヶ月</button><button data-b="126" class="on">6ヶ月</button><button data-b="252">1年</button>
       </div>
       <canvas id="ch-canvas" style="width:100%;height:340px"></canvas>
       <div class="chlegend tiny" id="ch-legend"></div>
@@ -1470,9 +1470,10 @@ function rsiSeries(close,len){ const out=Array(close.length).fill(null); let g=0
   return out; }
 function drawMiniChart(){
   const d=lastData, cv=document.getElementById('ch-canvas'); if(!d||!cv||!d.close) return;
-  const n=d.close.length, bars=Math.min(chartBars,n), i0=n-bars; if(bars<2) return;
-  const pchg=(d.close[n-1]/d.close[i0]-1)*100, dchg=n>=2?(d.close[n-1]/d.close[n-2]-1)*100:0;
-  const pLab={21:'1ヶ月',63:'3ヶ月',126:'半年',252:'1年'}[chartBars]||`${chartBars}本`;
+  const n=d.close.length, bars=Math.min(chartBars,n), i0=n-bars; if(bars<1) return;
+  const base=Math.max(0,n-1-bars);   // bars本前の終値を起点に騰落率
+  const pchg=(d.close[n-1]/d.close[base]-1)*100, dchg=n>=2?(d.close[n-1]/d.close[n-2]-1)*100:0;
+  const pLab={1:'1日',5:'5日',10:'10日',21:'1ヶ月',63:'3ヶ月',126:'半年',252:'1年'}[chartBars]||`${chartBars}本`;
   document.getElementById('ch-sym').textContent=lastSym||'';
   document.getElementById('ch-name').textContent=NAMES[lastSym]||'';
   const se=document.getElementById('ch-period'); se.textContent=`${pLab} ${pchg>=0?'+':''}${pchg.toFixed(1)}%`; se.className=pchg>=0?'pos':'neg';
@@ -1487,10 +1488,10 @@ function drawMiniChart(){
   const mas=MA_DEFS.map(m=>({...m, ser:smaSeries(d.close,m.len)}));
   let pMax=-Infinity,pMin=Infinity;
   for(let i=i0;i<n;i++){ pMax=Math.max(pMax,d.high[i]); pMin=Math.min(pMin,d.low[i]); for(const m of mas){ const v=m.ser[i]; if(v!=null){ pMax=Math.max(pMax,v); pMin=Math.min(pMin,v); } } }
-  const pRng=(pMax-pMin)||1, X=k=>padL+(bars<=1?0:k/(bars-1))*W, Yp=v=>priceTop+(1-(v-pMin)/pRng)*priceH;
+  const pRng=(pMax-pMin)||1, X=k=>padL+(bars<=1?W/2:k/(bars-1)*W), Yp=v=>priceTop+(1-(v-pMin)/pRng)*priceH;
   ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,.06)'; ctx.fillStyle='#7587a0'; ctx.font='10px sans-serif'; ctx.textAlign='left';
   for(let g=0;g<=4;g++){ const v=pMin+pRng*g/4, y=Yp(v); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+W,y); ctx.stroke(); ctx.fillText(v.toFixed(v<10?2:0), padL+W+3, y+3); }
-  const cw=Math.max(1, W/bars*0.62);
+  const cw=Math.min(36, Math.max(1, W/bars*0.62));
   for(let k=0;k<bars;k++){ const i=i0+k, o=d.open[i],c=d.close[i],h=d.high[i],l=d.low[i], up=c>=o, col=up?'#22c55e':'#ef4444', x=X(k);
     ctx.strokeStyle=col; ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(x,Yp(h)); ctx.lineTo(x,Yp(l)); ctx.stroke();
     const yo=Yp(o),yc=Yp(c); ctx.fillRect(x-cw/2, Math.min(yo,yc), cw, Math.max(1,Math.abs(yc-yo))); }
