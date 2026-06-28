@@ -1,15 +1,16 @@
 {
-  "version": "v45",
+  "version": "v46",
   "build": "20260628",
   "entry": "index.html",
-  "app": "app.js?v=45",
-  "css": "app.css?v=45",
-  "sw": "eiyou291-v45-20260628",
+  "app": "app.js?v=46",
+  "css": "app.css?v=46",
+  "sw": "eiyou291-v46-20260628",
   "start_url": "./",
   "questions": 291,
   "features": {
     "range": "?range=40-85（出題順の通し番号で範囲表示・共有）",
-    "deeplink": "#q40-85（第40回問85へスクロール）"
+    "deeplink": "#q40-85（第40回問85へスクロール）",
+    "weakness": "弱点分析の科目タップ→その科目の間違いだけを復習（トラッカー直下に常時表示）"
   },
   "note": "公開確認用。ルートが本体(最新版)を返しているかの判定に使う。SWキャッシュ対象外なので常にネットワークから最新を取得。"
 }

@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v45'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v46'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -207,19 +207,27 @@ window.addEventListener('unhandledrejection', function(event){
     var body=$('catstats-body'); if(!body) return;
     var html='';
     CATS.forEach(function(c){
-      var tot=0,ok=0,done=0;
+      var tot=0,ok=0,done=0,wrong=0;
       for(var i=0;i<arts.length;i++){
         if(arts[i].classList.contains(c.k)){
           tot++; var r=S.progress[arts[i].id];
-          if(r){ done++; if(r.s==='correct') ok++; }
+          if(r){ done++; if(r.s==='correct') ok++; else if(r.s==='wrong') wrong++; }
         }
       }
+      var todo=tot-done;
       var rate=done?Math.round(ok/done*100):0;
       var barCls, barW, rateLabel, rowCls='';
       if(!done){ barCls='none'; barW=100; rateLabel='未挑戦'; rowCls=' is-none'; }
       else { barCls=((done>=3 && rate<60)?'low':''); barW=rate; rateLabel=rate+'%'; }
-      html+='<div class="catrow'+rowCls+'"><div class="ct"><span>'+c.name+'</span><span><b>'+rateLabel+'</b> （'+ok+'/'+done+'・全'+tot+'）</span></div>'
-          +'<div class="catbar"><i class="'+barCls+'" style="width:'+barW+'%"></i></div></div>';
+      // タップ時の導線（弱点直結）：間違い＞未挑戦＞全問の順で促す
+      var cta = wrong>0 ? ('🔁 弱点 '+wrong+'問を復習 →')
+              : (todo>0 ? ('▶ 未挑戦 '+todo+'問を解く →')
+              : (done>0 ? '✓ 全問正解（見直す →）' : '▶ 解く →'));
+      var ctaCls = wrong>0 ? ' has-weak' : '';
+      html+='<div class="catrow'+rowCls+ctaCls+'" data-k="'+c.k+'" role="button" tabindex="0">'
+          +'<div class="ct"><span>'+c.name+'</span><span><b>'+rateLabel+'</b> （'+ok+'/'+done+'・全'+tot+'）</span></div>'
+          +'<div class="catbar"><i class="'+barCls+'" style="width:'+barW+'%"></i></div>'
+          +'<div class="catcta">'+cta+'</div></div>';
     });
     body.innerHTML=html;
   }
@@ -276,6 +284,25 @@ window.addEventListener('unhandledrejection', function(event){
   if(modeBtns.wrong) modeBtns.wrong.addEventListener('click',function(){ setMode('wrong'); });
   if(modeBtns.todo) modeBtns.todo.addEventListener('click',function(){ setMode('todo'); });
   if(modeBtns.star) modeBtns.star.addEventListener('click',function(){ setMode('star'); });
+
+  // ===== 弱点克服：科目別バーをタップ→その科目の「間違いだけ」へ（無ければ未挑戦/全問） =====
+  function drillSubject(k){
+    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
+    if(S.range) clearRange();
+    var setRadio=function(id){ var r=$(id); if(r){ r.checked=true; r.dispatchEvent(new Event('change',{bubbles:true})); } };
+    setRadio('f-all'); setRadio('f-dall'); setRadio('f-'+k); // 回=全・難易度=全・科目=k
+    var wrong=0,todo=0;
+    for(var i=0;i<arts.length;i++){ if(arts[i].classList.contains(k)){ var r=S.progress[arts[i].id]; if(!r) todo++; else if(r.s==='wrong') wrong++; } }
+    if(wrong>0) setMode('wrong'); else if(todo>0) setMode('todo'); else setMode('all');
+    var first=null; for(var j=0;j<arts.length;j++){ if(arts[j].offsetParent!==null){ first=arts[j]; break; } }
+    if(first) setTimeout(function(){ first.scrollIntoView({block:'start'}); },60);
+  }
+  (function(){
+    var cb=$('catstats-body'); if(!cb) return;
+    var rowOf=function(t){ return t&&t.closest?t.closest('.catrow'):null; };
+    cb.addEventListener('click',function(e){ var row=rowOf(e.target); if(row&&row.getAttribute('data-k')) drillSubject(row.getAttribute('data-k')); });
+    cb.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ var row=rowOf(e.target); if(row&&row.getAttribute('data-k')){ e.preventDefault(); drillSubject(row.getAttribute('data-k')); } } });
+  })();
 
   var resetBtn=$('mode-reset');
   if(resetBtn) resetBtn.addEventListener('click',function(){
