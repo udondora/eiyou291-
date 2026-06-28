@@ -1,10 +1,10 @@
 {
-  "version": "v63",
+  "version": "v64",
   "build": "20260628",
   "entry": "index.html",
-  "app": "app.js?v=63",
-  "css": "app.css?v=63",
-  "sw": "eiyou291-v63-20260628",
+  "app": "app.js?v=64",
+  "css": "app.css?v=64",
+  "sw": "eiyou291-v64-20260628",
   "start_url": "./",
   "questions": 600,
   "features": {

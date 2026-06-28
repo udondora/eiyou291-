@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v63'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v64'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -113,6 +113,7 @@ window.addEventListener('unhandledrejection', function(event){
   // JSが動く環境なので、トラッカーUIを表示（JS無効時は純CSS問題集のまま動く）
   [].forEach.call(document.querySelectorAll('.no-js-hide'),function(el){ el.classList.remove('no-js-hide'); });
   (function(){ var p=$('ver-pill'); if(p) p.textContent=APP_VERSION+' ・ '+TOTAL+'問 ・ 図解＋学習トラッカー ・ iPad対応'; })();
+  (function(){ var h=$('hcount'); if(h) h.textContent=TOTAL; })();
 
   function applyStatus(a,s){
     a.classList.remove('st-correct','st-wrong');
