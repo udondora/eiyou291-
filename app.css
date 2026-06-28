@@ -53,6 +53,40 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 .figurebox{margin:10px 0 13px;border:1px solid var(--bd);border-radius:12px;background:#f8fafc;padding:8px;overflow:hidden}
 .figurebox img{display:block;width:100%;height:auto;border-radius:8px;background:#fff}
 .figcap{font-size:11px;color:#4b5563;font-weight:900;margin-top:6px;text-align:center;line-height:1.5}
+/* ===== 図解（概念図・フロー・比較・棒・信頼区間） ===== */
+.dfig{margin:11px 0 13px;border:1px solid var(--bd);background:var(--bg);border-radius:12px;padding:11px 12px}
+.fig-cap{font-size:12px;font-weight:900;color:var(--ac);margin-bottom:9px}
+.fig-foot{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+.fig-flow{display:flex;flex-direction:column;align-items:stretch;gap:0}
+.fig-step{border:1px solid var(--bd);background:var(--sf);border-radius:10px;padding:9px 11px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.fig-step.hi{border-color:var(--ok);background:rgba(34,197,94,.12)}
+.fig-arrow{align-self:center;color:var(--ac);font-size:13px;line-height:1;margin:3px 0}
+.fig-tag{flex:0 0 auto;font-size:11px;font-weight:900;color:#00110e;background:var(--ac);border-radius:999px;padding:2px 9px}
+.fig-step.hi .fig-tag{background:var(--ok)}
+.fig-stext{font-size:13px;font-weight:800;color:var(--tx)}
+.fig-note{flex-basis:100%;font-size:11px;color:var(--muted);font-weight:700}
+.fig-levels{display:flex;flex-direction:column;gap:6px}
+.fig-level{display:flex;align-items:center;gap:9px;border:1px solid var(--bd);background:var(--sf);border-radius:10px;padding:8px 11px}
+.fig-level.hi{border-color:var(--ok);background:rgba(34,197,94,.12)}
+.fig-lvnum{flex:0 0 22px;width:22px;height:22px;border-radius:999px;background:var(--ac);color:#00110e;font-weight:900;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.fig-cwrap{overflow-x:auto}
+.fig-ctable{border-collapse:collapse;width:100%;font-size:12px}
+.fig-ctable th,.fig-ctable td{border:1px solid var(--bd);padding:7px 9px;text-align:center;color:var(--tx)}
+.fig-ctable thead th{background:var(--soft);color:var(--ac);font-weight:900}
+.fig-ctable tbody th{background:var(--sf2);color:var(--muted);font-weight:900;text-align:left;white-space:nowrap}
+.fig-bars{display:flex;flex-direction:column;gap:7px}
+.fig-barrow{display:flex;align-items:center;gap:8px}
+.fig-blabel{flex:0 0 32%;font-size:12px;font-weight:800;color:var(--tx);text-align:right}
+.fig-btrack{flex:1 1 auto;height:16px;background:var(--soft);border-radius:999px;overflow:hidden}
+.fig-bfill{display:block;height:100%;background:var(--blue);border-radius:999px}
+.fig-bfill.hi{background:var(--yellow)}
+.fig-bval{flex:0 0 auto;font-size:11px;font-weight:900;color:var(--muted);min-width:30px}
+.fig-scale{padding:4px 2px 2px}
+.fig-axis{position:relative;height:24px;background:var(--soft);border-radius:6px}
+.fig-null{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ng);transform:translateX(-1px)}
+.fig-ci{position:absolute;top:7px;height:10px;background:rgba(45,212,191,.55);border:1px solid var(--blue);border-radius:5px}
+.fig-pt{position:absolute;top:5px;width:14px;height:14px;border-radius:999px;background:var(--blue);border:2px solid var(--tx);transform:translateX(-7px)}
+.fig-axislabels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-weight:800;margin-top:5px}
 .hintbox{border-left:3px solid var(--yellow);background:rgba(245,158,11,.06);padding:8px 9px;border-radius:8px;margin:.45em 0;color:#e6edf3}
 .hintbox strong{color:var(--yellow)}
 

@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v64'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v65'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -61,6 +61,46 @@ window.addEventListener('unhandledrejection', function(event){
     var subName = { cat6:'栄養教育論', cat7:'臨床栄養学', cat8:'公衆栄養学', cat9:'給食経営管理論', cat10:'応用力試験' };
     var diffName = { easy:'基礎', medium:'標準', hard:'難問' };
     function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function buildFig(f){
+      if(!f||!f.type) return '';
+      var h='<div class="dfig">';
+      if(f.title) h+='<div class="fig-cap">📊 '+esc(f.title)+'</div>';
+      if(f.type==='flow'){
+        h+='<div class="fig-flow">';
+        (f.steps||[]).forEach(function(s,i){
+          if(i) h+='<div class="fig-arrow">▼</div>';
+          h+='<div class="fig-step'+(s.hi?' hi':'')+'">'+(s.tag?'<span class="fig-tag">'+esc(s.tag)+'</span>':'')+'<span class="fig-stext">'+esc(s.t)+'</span>'+(s.note?'<span class="fig-note">'+esc(s.note)+'</span>':'')+'</div>';
+        });
+        h+='</div>';
+      } else if(f.type==='levels'){
+        h+='<div class="fig-levels">';
+        (f.items||[]).forEach(function(s,i){
+          h+='<div class="fig-level'+(s.hi?' hi':'')+'"><span class="fig-lvnum">'+(i+1)+'</span><span class="fig-stext">'+esc(s.t)+'</span>'+(s.note?'<span class="fig-note">'+esc(s.note)+'</span>':'')+'</div>';
+        });
+        h+='</div>';
+      } else if(f.type==='compare'){
+        h+='<div class="fig-cwrap"><table class="fig-ctable">';
+        if(f.head){ h+='<thead><tr><th></th>'; f.head.forEach(function(x){ h+='<th>'+esc(x)+'</th>'; }); h+='</tr></thead>'; }
+        h+='<tbody>'; (f.rows||[]).forEach(function(r){ h+='<tr>'; r.forEach(function(c,ci){ var tg=ci===0?'th':'td'; h+='<'+tg+'>'+esc(c)+'</'+tg+'>'; }); h+='</tr>'; }); h+='</tbody></table></div>';
+      } else if(f.type==='bars'){
+        h+='<div class="fig-bars">';
+        (f.items||[]).forEach(function(s){
+          var v=Math.max(0,Math.min(100,+s.v||0));
+          h+='<div class="fig-barrow"><span class="fig-blabel">'+esc(s.t)+'</span><span class="fig-btrack"><span class="fig-bfill'+(s.hi?' hi':'')+'" style="width:'+v+'%"></span></span>'+(s.label?'<span class="fig-bval">'+esc(s.label)+'</span>':'')+'</div>';
+        });
+        h+='</div>';
+      } else if(f.type==='scale'){
+        var mn=+f.min, mx=+f.max, P=function(x){ return ((+x-mn)/(mx-mn)*100); };
+        h+='<div class="fig-scale"><div class="fig-axis">';
+        h+='<div class="fig-null" style="left:'+P(f.nul)+'%"></div>';
+        h+='<div class="fig-ci" style="left:'+P(f.lo)+'%;width:'+(P(f.hi)-P(f.lo))+'%"></div>';
+        if(f.point!=null) h+='<div class="fig-pt" style="left:'+P(f.point)+'%"></div>';
+        h+='</div><div class="fig-axislabels"><span>'+esc(mn)+'</span><span>'+esc(f.nul)+'（差なし）</span><span>'+esc(mx)+'</span></div></div>';
+      }
+      if(f.note) h+='<div class="fig-foot">'+esc(f.note)+'</div>';
+      h+='</div>';
+      return h;
+    }
     var html='';
     data.forEach(function(q){
       var qid='q'+q.y+'-'+q.n;
@@ -87,6 +127,7 @@ window.addEventListener('unhandledrejection', function(event){
       html+='<div class="fb okfb">✅ 正解です。選択肢下の理由と、詳しい解説で確認してください。</div><div class="fb ngfb">❌ 違います。選んだ選択肢の下に「なぜ違うか」と正解文を表示しています。</div>';
       html+='</div>';
       html+='<details class="exp"><summary>答え・解説を見る</summary><div><p class="ansline"><strong>正解：'+q.ans+'</strong>　'+esc(q.ansText||'')+'</p>';
+      if(q.fig) html+=buildFig(q.fig);
       if(q.point) html+='<p class="point"><strong>ポイント：</strong>'+esc(q.point)+'</p>';
       if(q.trap) html+='<p class="trap"><strong>注意：</strong>'+esc(q.trap)+'</p>';
       if(q.memory) html+='<p class="memoryline"><strong>一言暗記：</strong>'+esc(q.memory)+'</p>';
