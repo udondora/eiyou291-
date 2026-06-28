@@ -8,6 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
+  var APP_VERSION='v41'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -55,6 +56,7 @@ window.addEventListener('unhandledrejection', function(event){
 
   // JSが動く環境なので、トラッカーUIを表示（JS無効時は純CSS問題集のまま動く）
   [].forEach.call(document.querySelectorAll('.no-js-hide'),function(el){ el.classList.remove('no-js-hide'); });
+  (function(){ var p=$('ver-pill'); if(p) p.textContent=APP_VERSION+' ・ 291問 ・ 図解＋学習トラッカー ・ iPad対応'; })();
 
   function applyStatus(a,s){
     a.classList.remove('st-correct','st-wrong');
@@ -272,6 +274,7 @@ window.addEventListener('unhandledrejection', function(event){
     if(!confirm('学習の進捗記録（正解・不正解）をすべて消去します。よろしいですか？')) return;
     S.progress={}; save();
     arts.forEach(function(a){
+      a._sel=null;
       applyStatus(a,null);
       [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; });
     });
@@ -485,7 +488,7 @@ window.addEventListener('unhandledrejection', function(event){
     if(n>0) pool=pool.slice(0,n);
     S.test.list=pool; S.test.answers={};
     arts.forEach(function(a){ a.classList.remove('in-test'); });
-    S.test.list.forEach(function(a){ a.classList.add('in-test'); [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; }); });
+    S.test.list.forEach(function(a){ a.classList.add('in-test'); a._sel=null; [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; }); });
     var rest=arts.filter(function(a){ return S.test.list.indexOf(a)<0; });
     reorder(S.test.list.concat(rest));
     S.test.on=true; S.test.graded=false;
@@ -569,24 +572,27 @@ window.addEventListener('unhandledrejection', function(event){
   render();
 
   // ===== PWA（オフライン・ホーム画面追加・更新通知） =====
-  if('serviceWorker' in navigator && (location.protocol==='https:'||location.protocol==='http:')){
+  if('serviceWorker' in navigator && (window.isSecureContext || location.hostname==='localhost')){
     try{
       navigator.serviceWorker.register('sw.js').then(function(reg){
+        function showUpdateBar(){
+          var bar=$('updbar'); if(bar) bar.classList.add('show');
+          var btn=$('upd-btn'); if(btn) btn.onclick=function(){ if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); };
+        }
+        // 既に新SWが待機中（updatefoundを取り逃すケース）でも更新バーを出す
+        if(reg.waiting && navigator.serviceWorker.controller){ showUpdateBar(); }
         reg.addEventListener('updatefound',function(){
           var nw=reg.installing;
           if(!nw) return;
           nw.addEventListener('statechange',function(){
-            if(nw.state==='installed' && navigator.serviceWorker.controller){
-              var bar=$('updbar'); if(bar){ bar.classList.add('show'); }
-              var btn=$('upd-btn'); if(btn) btn.onclick=function(){ if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); };
-            }
+            if(nw.state==='installed' && navigator.serviceWorker.controller){ showUpdateBar(); }
           });
         });
-      }).catch(function(){});
+      }).catch(function(e){ console.warn('SW register failed:', e); });
       var refreshing=false;
       navigator.serviceWorker.addEventListener('controllerchange',function(){
         if(refreshing) return; refreshing=true; location.reload();
       });
-    }catch(e){}
+    }catch(e){ console.warn('SW setup error:', e); }
   }
 })();

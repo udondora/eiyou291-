@@ -13,8 +13,10 @@ import { fileURLToPath } from 'url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dir, '..');
-// 最新の eiyou291_v*.html を既定対象に
+// 既定対象はルートのアプリ本体 index.html（v41でルート＝アプリに統一）。
+// 互換のため eiyou291_v*.html が残っていればそれも対象に取れる。
 function latest() {
+  if (existsSync(resolve(root, 'index.html'))) return resolve(root, 'index.html');
   const f = readdirSync(root).filter(n => /^eiyou291_v\d+\.html$/.test(n))
     .sort((a, b) => (+a.match(/\d+/)[0]) - (+b.match(/\d+/)[0]));
   return f.length ? resolve(root, f[f.length - 1]) : null;
@@ -123,6 +125,29 @@ await p2.waitForTimeout(800);
 await p2.reload({ waitUntil: 'load' }); await p2.waitForTimeout(400);
 ok('backup export/import roundtrip', (await p2.evaluate(() => document.getElementById('prog-done').textContent)) !== '0');
 await ctx2.close();
+
+// 9) _sel 残留バグ: 通常学習で選んだ選択肢が、模試開始後に「再タップ＝解除」と誤判定されない
+{
+  const ctx3 = await b.newContext({ viewport: { width: 430, height: 1100 } });
+  const p3 = await ctx3.newPage();
+  p3.on('dialog', d => d.accept());
+  await p3.goto(fileUrl, { waitUntil: 'load' }); await p3.waitForTimeout(300);
+  // 通常学習で q40-3 の選択肢3を選ぶ（a._sel に残る）
+  await p3.evaluate(() => document.getElementById('q40-3').querySelectorAll('.choices label.choice')[2].click());
+  await p3.waitForTimeout(80);
+  // 模試（全問）を開始
+  await p3.evaluate(() => document.getElementById('tools-acc').open = true);
+  await p3.click('#btn-test'); await p3.waitForTimeout(50);
+  await p3.click('.tcount[data-n="0"]'); await p3.waitForTimeout(200);
+  const remainBefore = await p3.evaluate(() => +document.getElementById('t-remain').textContent);
+  // 模試中に q40-3 の選択肢3をタップ → 「選択」されるべき（解除されない）
+  await p3.evaluate(() => document.getElementById('q40-3').querySelectorAll('.choices label.choice')[2].click());
+  await p3.waitForTimeout(120);
+  const remainAfter = await p3.evaluate(() => +document.getElementById('t-remain').textContent);
+  const selected = await p3.evaluate(() => !!document.querySelector('#q40-3 input.ans:checked'));
+  ok('test start clears _sel (re-tap selects, not toggles off)', selected && remainAfter === remainBefore - 1, { remainBefore, remainAfter, selected });
+  await ctx3.close();
+}
 
 ok('no console/page errors', errors.length === 0, errors);
 

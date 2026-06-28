@@ -6,11 +6,10 @@
      （将来コードを分割した際、CSSリクエストにHTMLが返って謎エラーになるのを防ぐ）。
    - 学習の進捗記録は localStorage に保存（このSWは触らない）。
    - 新バージョンは「待機」し、ページ上の「更新」操作でのみ切り替える。 */
-const CACHE = 'eiyou291-v40-20260628';
+const CACHE = 'eiyou291-v41-20260628';
 const ASSETS = [
   './',
-  './index.html',
-  './eiyou291_v40.html',
+  './index.html',   // ルート＝アプリ本体（個別版ファイル名は廃止）
   './app.css',
   './app.js',
   './manifest.webmanifest',
@@ -52,7 +51,7 @@ self.addEventListener('fetch', event => {
         return res;
       }).catch(async () => {
         return (await caches.match('./index.html')) ||
-               (await caches.match('./eiyou291_v40.html'));
+               (await caches.match('./'));
       })
     );
     return;
