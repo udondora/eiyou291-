@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v42'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v43'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -445,6 +445,27 @@ window.addEventListener('unhandledrejection', function(event){
     rd.readAsText(f);
   });
 
+  // ===== 強制最新版取得（古いSW/キャッシュを掃除。学習記録(localStorage)は消さない） =====
+  function hardRefreshApp(){
+    return (async function(){
+      try{
+        if('serviceWorker' in navigator){
+          var regs=await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(function(reg){ return reg.unregister(); }));
+        }
+        if('caches' in window){
+          var keys=await caches.keys();
+          await Promise.all(keys.filter(function(k){ return k.indexOf('eiyou291-')===0; }).map(function(k){ return caches.delete(k); }));
+        }
+        location.replace('./?fresh='+Date.now());
+      }catch(e){ console.warn('hard refresh failed:', e); location.reload(); }
+    })();
+  }
+  var btnHard=$('btn-hardrefresh');
+  if(btnHard) btnHard.addEventListener('click',function(){
+    if(confirm('最新版を取り直します（学習記録は消えません）。よろしいですか？')) hardRefreshApp();
+  });
+
   // ===== 解説の自動表示トグル =====
   var AE_KEY='eiyou291_autoexp';
   var autoExp = safeGetRaw(AE_KEY,'1')!=='0';
@@ -579,12 +600,24 @@ window.addEventListener('unhandledrejection', function(event){
   updateResume();
   render();
 
+  // ===== 診断オーバーレイ（?debug=1 のときだけ表示） =====
+  if(location.search.indexOf('debug=1')!==-1){
+    (async function(){
+      var names=[]; try{ if('caches' in window) names=await caches.keys(); }catch(e){}
+      var box=document.createElement('div');
+      box.style.cssText='position:fixed;right:8px;bottom:8px;z-index:99999;font-size:11px;background:#111827;color:#fff;padding:6px 8px;border-radius:8px;opacity:.8;max-width:90vw;word-break:break-all';
+      box.textContent='app='+APP_VERSION+' / q='+TOTAL+' / sw='+((navigator.serviceWorker&&navigator.serviceWorker.controller)?'on':'off')+' / cache='+names.join(',');
+      document.body.appendChild(box);
+    })();
+  }
+
   // ===== PWA（オフライン・ホーム画面追加・更新通知） =====
   if('serviceWorker' in navigator && (window.isSecureContext || location.hostname==='localhost')){
     try{
-      navigator.serviceWorker.register('sw.js').then(function(reg){
-        try{ reg.update(); }catch(e){}
-        setInterval(function(){ try{ reg.update(); }catch(e){} }, 60*60*1000); // 1時間ごとに更新確認
+      navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){
+        var doUpdate=function(){ try{ var pr=reg.update(); if(pr&&pr.catch) pr.catch(function(){}); }catch(e){} };
+        doUpdate();
+        setInterval(doUpdate, 60*60*1000); // 1時間ごとに更新確認（失敗は無視）
         function showUpdateBar(){
           var bar=$('updbar'); if(bar) bar.classList.add('show');
           var btn=$('upd-btn'); if(btn) btn.onclick=function(){ if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); };
