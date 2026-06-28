@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v55'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v56'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -69,6 +69,13 @@ window.addEventListener('unhandledrejection', function(event){
       html+='<div class="meta"><span class="exam e'+q.y+'">第'+q.y+'回</span><span>問'+q.n+'</span><span>'+esc(subName[q.sub]||'')+'</span><span class="diff '+(q.diff||'medium')+'">'+(diffName[q.diff]||'標準')+'</span></div>';
       if(q.theme){ html+='<div class="themebox"><b>この問題のテーマ：</b>'+esc(q.theme)+(q.aim?'<span class="small"><b>狙い：</b>'+esc(q.aim)+'</span>':'')+'</div>'; }
       html+='<div class="qt">'+esc(q.stem)+'</div>';
+      if(q.table){ var tb=q.table;
+        html+='<div class="rsrc"><div class="rsrc-cap">'+esc(tb.caption||'資料')+'</div><div class="rsrc-scroll"><table class="rtable">';
+        if(tb.headers){ html+='<thead><tr>'; tb.headers.forEach(function(h){ html+='<th>'+esc(h)+'</th>'; }); html+='</tr></thead>'; }
+        html+='<tbody>'; (tb.rows||[]).forEach(function(r){ html+='<tr>'; r.forEach(function(c,ci){ var tg=(ci===0&&tb.rowHeader)?'th':'td'; html+='<'+tg+'>'+esc(c)+'</'+tg+'>'; }); html+='</tr>'; }); html+='</tbody></table></div>';
+        if(tb.notes) tb.notes.forEach(function(nn){ html+='<div class="rsrc-note">'+esc(nn)+'</div>'; });
+        html+='</div>';
+      }
       html+='<div class="choices">';
       q.choices.forEach(function(c,i){
         var k=i+1, isC=(k===q.ans);
