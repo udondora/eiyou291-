@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v65'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v66'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -79,9 +79,11 @@ window.addEventListener('unhandledrejection', function(event){
         });
         h+='</div>';
       } else if(f.type==='compare'){
+        var _rows=f.rows||[], _maxc=0; _rows.forEach(function(r){ if(r.length>_maxc) _maxc=r.length; });
+        var _lead = f.head && f.head.length === (_maxc-1); // 先頭列が行見出しのとき空ヘッダを足す
         h+='<div class="fig-cwrap"><table class="fig-ctable">';
-        if(f.head){ h+='<thead><tr><th></th>'; f.head.forEach(function(x){ h+='<th>'+esc(x)+'</th>'; }); h+='</tr></thead>'; }
-        h+='<tbody>'; (f.rows||[]).forEach(function(r){ h+='<tr>'; r.forEach(function(c,ci){ var tg=ci===0?'th':'td'; h+='<'+tg+'>'+esc(c)+'</'+tg+'>'; }); h+='</tr>'; }); h+='</tbody></table></div>';
+        if(f.head){ h+='<thead><tr>'; if(_lead) h+='<th></th>'; f.head.forEach(function(x){ h+='<th>'+esc(x)+'</th>'; }); h+='</tr></thead>'; }
+        h+='<tbody>'; _rows.forEach(function(r){ h+='<tr>'; r.forEach(function(c,ci){ var tg=ci===0?'th':'td'; h+='<'+tg+'>'+esc(c)+'</'+tg+'>'; }); h+='</tr>'; }); h+='</tbody></table></div>';
       } else if(f.type==='bars'){
         h+='<div class="fig-bars">';
         (f.items||[]).forEach(function(s){
@@ -127,7 +129,7 @@ window.addEventListener('unhandledrejection', function(event){
       html+='<div class="fb okfb">✅ 正解です。選択肢下の理由と、詳しい解説で確認してください。</div><div class="fb ngfb">❌ 違います。選んだ選択肢の下に「なぜ違うか」と正解文を表示しています。</div>';
       html+='</div>';
       html+='<details class="exp"><summary>答え・解説を見る</summary><div><p class="ansline"><strong>正解：'+q.ans+'</strong>　'+esc(q.ansText||'')+'</p>';
-      if(q.fig) html+=buildFig(q.fig);
+      var _fig=q.fig||(window.EIYOU_FIG&&window.EIYOU_FIG[q.y+'-'+q.n]); if(_fig) html+=buildFig(_fig);
       if(q.point) html+='<p class="point"><strong>ポイント：</strong>'+esc(q.point)+'</p>';
       if(q.trap) html+='<p class="trap"><strong>注意：</strong>'+esc(q.trap)+'</p>';
       if(q.memory) html+='<p class="memoryline"><strong>一言暗記：</strong>'+esc(q.memory)+'</p>';
