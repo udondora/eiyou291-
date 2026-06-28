@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v52'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v53'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -52,6 +52,44 @@ window.addEventListener('unhandledrejection', function(event){
   };
   function saveStars(){ safeSave(STAR_KEY,S.stars); }
 
+  // ===== 午後問題をデータ(pm.js)から描画（既存の午前HTMLには触れない） =====
+  // .qwrap に <article class="q"> として注入してから arts を集めるので、検索・絞込・
+  // トラッカー・○✕マップなど既存機能がそのまま適用される。
+  (function renderPM(){
+    var data = window.EIYOU_PM; if(!data || !data.length) return;
+    var wrap = document.querySelector('.qwrap'); if(!wrap) return;
+    var subName = { cat6:'栄養教育論', cat7:'臨床栄養学', cat8:'公衆栄養学', cat9:'給食経営管理論', cat10:'応用力試験' };
+    var diffName = { easy:'基礎', medium:'標準', hard:'難問' };
+    function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    var html='';
+    data.forEach(function(q){
+      var qid='q'+q.y+'-'+q.n;
+      var cls='q ex'+q.y+' '+(q.diff||'medium')+' '+q.sub;
+      html+='<article class="'+cls+'" id="'+qid+'">';
+      html+='<div class="meta"><span class="exam e'+q.y+'">第'+q.y+'回</span><span>問'+q.n+'</span><span>'+esc(subName[q.sub]||'')+'</span><span class="diff '+(q.diff||'medium')+'">'+(diffName[q.diff]||'標準')+'</span></div>';
+      if(q.theme){ html+='<div class="themebox"><b>この問題のテーマ：</b>'+esc(q.theme)+(q.aim?'<span class="small"><b>狙い：</b>'+esc(q.aim)+'</span>':'')+'</div>'; }
+      html+='<div class="qt">'+esc(q.stem)+'</div>';
+      html+='<div class="choices">';
+      q.choices.forEach(function(c,i){
+        var k=i+1, isC=(k===q.ans);
+        html+='<input class="ans '+(isC?'correct':'wrong')+'" id="'+qid+'-'+k+'" name="'+qid+'" type="radio"/>';
+        html+='<label class="choice'+(isC?' is-correct':'')+'" for="'+qid+'-'+k+'"><span class="num">'+k+'</span><span>'+esc(c.t)+'</span></label>';
+        html+='<div class="why '+(isC?'why-ok':'why-ng')+'"><div class="whytitle">'+(isC?'✅ 正解：この文章が正解になる理由':'❌ 選択肢'+k+' は不正解です。')+'</div><div class="checkline"><b>なぜ：</b>'+esc(c.why||'')+'</div>'+((!isC&&c.fix)?'<div class="correctline"><b>正しくは：</b>'+esc(c.fix)+'</div>':'')+'</div>';
+      });
+      html+='<input class="ans clear" id="'+qid+'-clear" name="'+qid+'" type="radio"/><label class="clearbtn" for="'+qid+'-clear">選択をクリア</label>';
+      html+='<div class="fb okfb">✅ 正解です。選択肢下の理由と、詳しい解説で確認してください。</div><div class="fb ngfb">❌ 違います。選んだ選択肢の下に「なぜ違うか」と正解文を表示しています。</div>';
+      html+='</div>';
+      html+='<details class="exp"><summary>答え・解説を見る</summary><div><p class="ansline"><strong>正解：'+q.ans+'</strong>　'+esc(q.ansText||'')+'</p>';
+      if(q.point) html+='<p class="point"><strong>ポイント：</strong>'+esc(q.point)+'</p>';
+      if(q.trap) html+='<p class="trap"><strong>注意：</strong>'+esc(q.trap)+'</p>';
+      if(q.memory) html+='<p class="memoryline"><strong>一言暗記：</strong>'+esc(q.memory)+'</p>';
+      html+='</div></details>';
+      html+='<div class="qnav"><a class="menu" href="#top">↑ メニュー</a></div>';
+      html+='</article>';
+    });
+    wrap.insertAdjacentHTML('beforeend', html);
+  })();
+
   var arts=[].slice.call(document.querySelectorAll('article.q'));
   var TOTAL=arts.length;
   console.info('[EIYOU291]', { appVersion: APP_VERSION, totalQuestions: TOTAL, startUrl: './' });
@@ -59,12 +97,15 @@ window.addEventListener('unhandledrejection', function(event){
   // 出題順の通し番号(1..291)。共有リンクの範囲指定はシャッフルに依らず固定にしたいので元の順で確定。
   origOrder.forEach(function(a,i){ a._pos=i+1; });
   var qwrapEl=TOTAL?arts[0].parentNode:null;
-  var CATS=[{k:'cat1',name:'社会・環境と健康'},{k:'cat2',name:'人体・疾病'},{k:'cat3',name:'食べ物と健康'},{k:'cat4',name:'基礎栄養学'},{k:'cat5',name:'応用栄養学'}];
+  var CATS=[{k:'cat1',name:'社会・環境と健康'},{k:'cat2',name:'人体・疾病'},{k:'cat3',name:'食べ物と健康'},{k:'cat4',name:'基礎栄養学'},{k:'cat5',name:'応用栄養学'},
+            {k:'cat6',name:'栄養教育論'},{k:'cat7',name:'臨床栄養学'},{k:'cat8',name:'公衆栄養学'},{k:'cat9',name:'給食経営管理論'},{k:'cat10',name:'応用力試験'}];
+  // 弱点分析は「その科目の問題が1問でもあるとき」だけ表示（午後を段階的に追加するため）
+  CATS = CATS.filter(function(c){ return document.querySelector('article.q.'+c.k); });
   setText('prog-total',TOTAL); setText('fab-total',TOTAL); setText('st-todo',TOTAL);
 
   // JSが動く環境なので、トラッカーUIを表示（JS無効時は純CSS問題集のまま動く）
   [].forEach.call(document.querySelectorAll('.no-js-hide'),function(el){ el.classList.remove('no-js-hide'); });
-  (function(){ var p=$('ver-pill'); if(p) p.textContent=APP_VERSION+' ・ 291問 ・ 図解＋学習トラッカー ・ iPad対応'; })();
+  (function(){ var p=$('ver-pill'); if(p) p.textContent=APP_VERSION+' ・ '+TOTAL+'問 ・ 図解＋学習トラッカー ・ iPad対応'; })();
 
   function applyStatus(a,s){
     a.classList.remove('st-correct','st-wrong');

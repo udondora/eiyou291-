@@ -16,7 +16,7 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 #f-39:checked ~ .filt label[for=f-39]{border-color:var(--blue);color:var(--blue);background:rgba(45,212,191,.12)}
 #f-38:checked ~ .filt label[for=f-38]{border-color:#a78bfa;color:#a78bfa;background:rgba(167,139,250,.12)}
 #f-easy:checked ~ .filt label[for=f-easy],#f-medium:checked ~ .filt label[for=f-medium],#f-hard:checked ~ .filt label[for=f-hard]{border-color:var(--ac);color:var(--ac);background:rgba(56,189,248,.12)}
-#f-cat1:checked ~ .filt label[for=f-cat1], #f-cat2:checked ~ .filt label[for=f-cat2], #f-cat3:checked ~ .filt label[for=f-cat3], #f-cat4:checked ~ .filt label[for=f-cat4], #f-cat5:checked ~ .filt label[for=f-cat5]{border-color:var(--ac);color:var(--ac);background:rgba(56,189,248,.12)}
+#f-cat1:checked ~ .filt label[for=f-cat1], #f-cat2:checked ~ .filt label[for=f-cat2], #f-cat3:checked ~ .filt label[for=f-cat3], #f-cat4:checked ~ .filt label[for=f-cat4], #f-cat5:checked ~ .filt label[for=f-cat5], #f-cat6:checked ~ .filt label[for=f-cat6], #f-cat7:checked ~ .filt label[for=f-cat7], #f-cat8:checked ~ .filt label[for=f-cat8], #f-cat9:checked ~ .filt label[for=f-cat9], #f-cat10:checked ~ .filt label[for=f-cat10]{border-color:var(--ac);color:var(--ac);background:rgba(56,189,248,.12)}
 #f-40:checked ~ form .q:not(.ex40),#f-39:checked ~ form .q:not(.ex39),#f-38:checked ~ form .q:not(.ex38){display:none}
 #f-easy:checked ~ form .q:not(.easy),#f-medium:checked ~ form .q:not(.medium),#f-hard:checked ~ form .q:not(.hard){display:none}
 #f-cat1:checked ~ form .q:not(.cat1){display:none}
@@ -24,6 +24,11 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 #f-cat3:checked ~ form .q:not(.cat3){display:none}
 #f-cat4:checked ~ form .q:not(.cat4){display:none}
 #f-cat5:checked ~ form .q:not(.cat5){display:none}
+#f-cat6:checked ~ form .q:not(.cat6){display:none}
+#f-cat7:checked ~ form .q:not(.cat7){display:none}
+#f-cat8:checked ~ form .q:not(.cat8){display:none}
+#f-cat9:checked ~ form .q:not(.cat9){display:none}
+#f-cat10:checked ~ form .q:not(.cat10){display:none}
 .tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 0}.tool{border:1px solid var(--bd);background:var(--sf);border-radius:12px;padding:10px;text-align:center;color:var(--tx);text-decoration:none;font-weight:900;font-size:13px}.tool small{display:block;color:var(--muted);font-size:10px}
 .qwrap{display:block}.q{background:var(--sf);border:1px solid #475569;border-left:6px solid var(--ac);border-radius:15px;margin:26px 0;padding:16px 14px;scroll-margin-top:70px;box-shadow:0 6px 18px rgba(0,0,0,.38)}
 /* 出題回ごとに左ラインを色分け（未挑戦の状態色） */

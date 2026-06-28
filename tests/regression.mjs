@@ -44,6 +44,8 @@ const openTools = () => page.evaluate(() => { const t = document.getElementById(
 
 await page.goto(fileUrl, { waitUntil: 'load' });
 await page.waitForTimeout(400);
+// 総問数は動的に取得（午後追加で増えるため固定値にしない）
+const TOTAL_Q = await page.evaluate(() => document.querySelectorAll('article.q').length);
 
 // 0) 外部CSS/JSが効いている（トラッカー表示＝JS実行、見出し色＝CSS適用）
 ok('css+js loaded (appbar visible)', await page.isVisible('#appbar'));
@@ -66,7 +68,7 @@ await page.click('#mode-wrong'); await page.waitForTimeout(120);
 const searchWrongN = await visCount();
 ok('search + wrong combine', searchN > 0 && searchWrongN <= searchN, { searchN, searchWrongN });
 await page.click('#mode-all'); await page.fill('#q-search', ''); await page.waitForTimeout(150);
-ok('reset shows all 291', (await visCount()) === 291);
+ok('reset shows all (dynamic total)', (await visCount()) === TOTAL_Q, { TOTAL_Q });
 
 // 4) 科目フィルタ + 模試（対象外が出ない）
 await page.evaluate(() => document.getElementById('filt').open = true);
@@ -94,7 +96,7 @@ await page.click('#t-quit2'); await page.waitForTimeout(120);
 ok('exit test returns to filtered list (cat1=48)', (await visCount()) === 48, { n: await visCount() });
 // フィルタ解除で全件に戻る
 await page.evaluate(() => document.getElementById('f-catall').click()); await page.waitForTimeout(120);
-ok('clear filter shows all 291', (await visCount()) === 291);
+ok('clear filter shows all (dynamic total)', (await visCount()) === TOTAL_Q, { TOTAL_Q });
 
 // 6) 集中モード + シャッフルで崩れない（シャッフルで集中終了）
 await page.click('#btn-focus'); await page.waitForTimeout(150);
@@ -222,7 +224,7 @@ await ctx2.close();
   ok('range bar visible', barShown);
   // 解除で全291件
   await p7.click('#range-clear'); await p7.waitForTimeout(200);
-  ok('range clear shows all 291', (await p7.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length)) === 291);
+  ok('range clear shows all', (await p7.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length)) === TOTAL_Q);
   await ctx7.close();
 }
 
