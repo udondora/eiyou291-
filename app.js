@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v66'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v67'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -103,6 +103,7 @@ window.addEventListener('unhandledrejection', function(event){
       h+='</div>';
       return h;
     }
+    window.__buildFig = buildFig; // 午前の静的問題にも図を挿入できるよう共有
     var html='';
     data.forEach(function(q){
       var qid='q'+q.y+'-'+q.n;
@@ -138,6 +139,17 @@ window.addEventListener('unhandledrejection', function(event){
       html+='</article>';
     });
     wrap.insertAdjacentHTML('beforeend', html);
+  })();
+
+  // 午前（静的HTML）の問題にも図マップから図を挿入する
+  (function injectStaticFigs(){
+    if(!window.EIYOU_FIG || !window.__buildFig) return;
+    Object.keys(window.EIYOU_FIG).forEach(function(key){
+      var art=document.getElementById('q'+key); if(!art) return;
+      if(art.querySelector('.dfig')) return; // 午後は renderPM で挿入済み
+      var ans=art.querySelector('.exp .ansline'); if(!ans) return;
+      ans.insertAdjacentHTML('afterend', window.__buildFig(window.EIYOU_FIG[key]));
+    });
   })();
 
   var arts=[].slice.call(document.querySelectorAll('article.q'));
