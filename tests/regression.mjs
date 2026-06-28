@@ -1,0 +1,134 @@
+/* 回帰テスト（Playwright）
+ * 使い方:
+ *   npm i playwright-core   # または playwright
+ *   node tests/regression.mjs [path-to-html]
+ * 既定では同階層の最新HTMLを file:// で開く。CHROME 環境変数で Chrome のパスを指定可。
+ *
+ * 機能が多く「組み合わせ」でバグが出やすいので、下記の重点シナリオを自動確認する。
+ */
+import { chromium } from 'playwright-core';
+import { existsSync, readdirSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dir = dirname(fileURLToPath(import.meta.url));
+const root = resolve(__dir, '..');
+// 最新の eiyou291_v*.html を既定対象に
+function latest() {
+  const f = readdirSync(root).filter(n => /^eiyou291_v\d+\.html$/.test(n))
+    .sort((a, b) => (+a.match(/\d+/)[0]) - (+b.match(/\d+/)[0]));
+  return f.length ? resolve(root, f[f.length - 1]) : null;
+}
+const target = process.argv[2] ? resolve(process.argv[2]) : latest();
+if (!target || !existsSync(target)) { console.error('target html not found:', target); process.exit(2); }
+const fileUrl = 'file://' + target;
+const exe = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+
+const results = [];
+const ok = (name, cond, extra) => { results.push({ name, pass: !!cond, extra }); };
+
+const b = await chromium.launch({ executablePath: exe });
+const ctx = await b.newContext({ viewport: { width: 430, height: 1100 } });
+const page = await ctx.newPage();
+const errors = [];
+page.on('pageerror', e => errors.push('PAGEERROR ' + e.message));
+page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE ' + m.text()); });
+
+const pick = (id) => page.evaluate(i => { const e = document.getElementById(i); e.checked = true; e.dispatchEvent(new Event('change', { bubbles: true })); }, id);
+const clickChoice = (qid, n) => page.evaluate(([q, i]) => { document.getElementById(q).querySelectorAll('.choices label.choice')[i - 1].click(); }, [qid, n]);
+const visCount = () => page.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length);
+const txt = (id) => page.evaluate(i => (document.getElementById(i) || {}).textContent, id);
+const openTools = () => page.evaluate(() => { const t = document.getElementById('tools-acc'); if (t) t.open = true; });
+
+await page.goto(fileUrl, { waitUntil: 'load' });
+await page.waitForTimeout(400);
+
+// 0) 外部CSS/JSが効いている（トラッカー表示＝JS実行、見出し色＝CSS適用）
+ok('css+js loaded (appbar visible)', await page.isVisible('#appbar'));
+
+// 1) 解答と永続化
+await pick('q40-1-4'); // correct
+await pick(await page.evaluate(() => document.getElementById('q40-2').querySelector('input.ans.wrong').id)); // wrong
+ok('answer counts', (await txt('st-ok')) === '1' && (await txt('st-ng')) === '1' && (await txt('prog-done')) === '2');
+
+// 2) 選択肢トグル解除で数が戻る
+await clickChoice('q40-1', 4); // re-tap selected correct -> toggle off
+await page.waitForTimeout(120);
+ok('toggle off reverts count', (await txt('st-ok')) === '0' && (await txt('prog-done')) === '1');
+await pick('q40-1-4'); // restore
+
+// 3) 検索 + 不正解だけ
+await page.fill('#q-search', 'インスリン'); await page.waitForTimeout(250);
+const searchN = await visCount();
+await page.click('#mode-wrong'); await page.waitForTimeout(120);
+const searchWrongN = await visCount();
+ok('search + wrong combine', searchN > 0 && searchWrongN <= searchN, { searchN, searchWrongN });
+await page.click('#mode-all'); await page.fill('#q-search', ''); await page.waitForTimeout(150);
+ok('reset shows all 291', (await visCount()) === 291);
+
+// 4) 科目フィルタ + 模試（対象外が出ない）
+await page.evaluate(() => document.getElementById('filt').open = true);
+await page.evaluate(() => document.getElementById('f-cat1').click()); await page.waitForTimeout(120);
+await openTools();
+await page.click('#btn-test'); await page.waitForTimeout(50); await page.click('.tcount[data-n="10"]'); await page.waitForTimeout(150);
+const testAllCat1 = await page.evaluate(() => [...document.querySelectorAll('article.q.in-test')].every(a => a.classList.contains('cat1')));
+ok('test pool respects subject filter', testAllCat1);
+
+// 5) 模試中にキーボードで解答しても通常進捗を汚さない（採点までstateは変わらない）
+const doneBeforeKey = await txt('prog-done');
+await page.evaluate(() => document.querySelector('article.q.in-test').scrollIntoView({ block: 'start' }));
+await page.waitForTimeout(300);
+await page.keyboard.press('1'); await page.waitForTimeout(80);
+ok('test keyboard does not pollute progress', (await txt('prog-done')) === doneBeforeKey, { doneBeforeKey, after: await txt('prog-done') });
+// 採点
+await page.click('#t-grade'); await page.waitForTimeout(150);
+ok('grade reveals result', /結果/.test(await page.evaluate(() => (document.querySelector('#test-bar .tg') || {}).textContent || '')));
+// 採点後キーで進捗が変わらない
+const doneAfterGrade = await txt('prog-done');
+await page.keyboard.press('2'); await page.waitForTimeout(80);
+ok('keys disabled after grading', (await txt('prog-done')) === doneAfterGrade);
+await page.click('#t-quit2'); await page.waitForTimeout(120);
+// 終了直後はフィルタ(cat1=48問)が残った状態に戻る
+ok('exit test returns to filtered list (cat1=48)', (await visCount()) === 48, { n: await visCount() });
+// フィルタ解除で全件に戻る
+await page.evaluate(() => document.getElementById('f-catall').click()); await page.waitForTimeout(120);
+ok('clear filter shows all 291', (await visCount()) === 291);
+
+// 6) 集中モード + シャッフルで崩れない（シャッフルで集中終了）
+await page.click('#btn-focus'); await page.waitForTimeout(150);
+const inFocus = await page.evaluate(() => document.body.classList.contains('focus-mode'));
+await openTools();
+await page.click('#btn-shuffle'); await page.waitForTimeout(120);
+ok('shuffle exits focus (no stale list)', inFocus && !(await page.evaluate(() => document.body.classList.contains('focus-mode'))));
+await page.click('#btn-seq'); await page.waitForTimeout(80);
+
+// 7) 永続化（リロード後も進捗・選択が残る）
+await page.reload({ waitUntil: 'load' }); await page.waitForTimeout(400);
+ok('progress persists after reload', (await txt('prog-done')) !== '0' && (await page.evaluate(() => !!document.querySelector('#q40-1-4:checked'))));
+
+// 8) バックアップ書き出し→クリア→読み込みで復元
+const ctx2 = await b.newContext({ viewport: { width: 430, height: 1100 }, acceptDownloads: true });
+const p2 = await ctx2.newPage();
+p2.on('dialog', d => d.accept());
+await p2.goto(fileUrl, { waitUntil: 'load' }); await p2.waitForTimeout(300);
+await p2.evaluate(() => { const e = document.getElementById('q40-1-4'); e.checked = true; e.dispatchEvent(new Event('change', { bubbles: true })); });
+await p2.evaluate(() => document.getElementById('tools-acc').open = true);
+const [dl] = await Promise.all([p2.waitForEvent('download'), p2.click('#btn-export')]);
+const path = await dl.path();
+await p2.evaluate(() => localStorage.clear());
+await p2.reload({ waitUntil: 'load' }); await p2.waitForTimeout(300);
+await p2.evaluate(() => document.getElementById('tools-acc').open = true);
+await p2.setInputFiles('#import-file', path);
+await p2.waitForTimeout(800);
+await p2.reload({ waitUntil: 'load' }); await p2.waitForTimeout(400);
+ok('backup export/import roundtrip', (await p2.evaluate(() => document.getElementById('prog-done').textContent)) !== '0');
+await ctx2.close();
+
+ok('no console/page errors', errors.length === 0, errors);
+
+await b.close();
+
+let failed = 0;
+for (const r of results) { if (!r.pass) failed++; console.log((r.pass ? 'PASS ' : 'FAIL ') + r.name + (r.extra && !r.pass ? '  ' + JSON.stringify(r.extra) : '')); }
+console.log(`\n${results.length - failed}/${results.length} passed`);
+process.exit(failed ? 1 : 0);
