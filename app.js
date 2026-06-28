@@ -28,16 +28,23 @@ window.addEventListener('unhandledrejection', function(event){
   function isObj(x){ return x && typeof x==='object' && !Array.isArray(x); }
 
   var KEY='eiyou291_v26_progress';
-  var state=safeLoad(KEY,{}); if(!isObj(state)) state={};
-  function save(){ safeSave(KEY,state); }
+  function save(){ safeSave(KEY,S.progress); }
   function $(id){ return document.getElementById(id); }
   function setText(id,v){ var e=$(id); if(e) e.textContent=v; }
 
   // ★ブックマーク・続きから・文字サイズのキー
   var STAR_KEY='eiyou291_v29_stars', LAST_KEY='eiyou291_v29_last', FS_KEY='eiyou291_v27_fs';
-  var stars=safeLoad(STAR_KEY,{}); if(!isObj(stars)) stars={};
-  function saveStars(){ safeSave(STAR_KEY,stars); }
-  var lastSeen=safeGetRaw(LAST_KEY,null) || null;
+  // ===== アプリの状態を1か所に集約（v40） =====
+  var S = {
+    progress: (function(){ var v=safeLoad(KEY,{}); return isObj(v)?v:{}; })(),
+    stars:    (function(){ var v=safeLoad(STAR_KEY,{}); return isObj(v)?v:{}; })(),
+    lastSeen: safeGetRaw(LAST_KEY,null) || null,
+    mode:  'all',
+    focus: { on:false, list:[], idx:0 },
+    test:  { on:false, graded:false, list:[], answers:{} },
+    cmapOpen: false
+  };
+  function saveStars(){ safeSave(STAR_KEY,S.stars); }
 
   var arts=[].slice.call(document.querySelectorAll('article.q'));
   var TOTAL=arts.length;
@@ -58,12 +65,12 @@ window.addEventListener('unhandledrejection', function(event){
   }
 
   function applyStar(a){
-    var on=!!stars[a.id];
+    var on=!!S.stars[a.id];
     a.classList.toggle('st-star',on);
     if(a._star) a._star.textContent = on ? '★ 見直し中' : '☆ 見直し';
   }
   function toggleStar(a){
-    if(stars[a.id]) delete stars[a.id]; else stars[a.id]=1;
+    if(S.stars[a.id]) delete S.stars[a.id]; else S.stars[a.id]=1;
     saveStars(); applyStar(a);
     if(document.body.classList.contains('rev-star')) updateVisible();
   }
@@ -133,7 +140,7 @@ window.addEventListener('unhandledrejection', function(event){
     applyStar(a);
     buildCmap(a);
     // 保存済み記録を復元（選んだ選択肢も復元して解説を再現）
-    var rec=state[a.id];
+    var rec=S.progress[a.id];
     if(rec){
       if(rec.c){ var ri=document.getElementById(rec.c); if(ri){ ri.checked=true; a._sel=ri; } }
       applyStatus(a,rec.s);
@@ -145,14 +152,14 @@ window.addEventListener('unhandledrejection', function(event){
         if(inp.classList.contains('clear')) return;
         if(a._sel===inp){
           inp.checked=false; a._sel=null;
-          if(testMode){ delete testAnswers[a.id]; updateTestBar(); }
+          if(S.test.on){ delete S.test.answers[a.id]; updateTestBar(); }
           else { setStatus(a,null,null); a.scrollIntoView({block:'start'}); }
         }
       });
       inp.addEventListener('change',function(){
-        if(testMode){
-          if(inp.classList.contains('clear')){ delete testAnswers[a.id]; a._sel=null; }
-          else if(inp.checked){ testAnswers[a.id]=inp.id; a._sel=inp; }
+        if(S.test.on){
+          if(inp.classList.contains('clear')){ delete S.test.answers[a.id]; a._sel=null; }
+          else if(inp.checked){ S.test.answers[a.id]=inp.id; a._sel=inp; }
           updateTestBar(); return;
         }
         if(inp.classList.contains('clear')){ a._sel=null; setStatus(a,null,null); return; }
@@ -166,21 +173,21 @@ window.addEventListener('unhandledrejection', function(event){
     // 「次の問題へ」ボタン
     var nb=document.createElement('button'); nb.type='button'; nb.className='nextq-btn'; nb.textContent='次の問題へ →';
     nb.addEventListener('click',function(){
-      if(focusOn){ if(focusIdx<focusList.length-1){ focusIdx++; showFocus(); } return; }
+      if(S.focus.on){ if(S.focus.idx<S.focus.list.length-1){ S.focus.idx++; showFocus(); } return; }
       var nx=nextAfter(a); if(nx){ nx.scrollIntoView({block:'start'}); } else { alert('最後の問題です。'); }
     });
     a.appendChild(nb);
   });
 
   function setStatus(a,s,cid){
-    if(s){ state[a.id]={s:s,c:cid}; recordLast(a.id); } else { delete state[a.id]; }
+    if(s){ S.progress[a.id]={s:s,c:cid}; recordLast(a.id); } else { delete S.progress[a.id]; }
     applyStatus(a,s); save(); render();
   }
 
   function longestCorrect(){
     var best=0,cur=0;
     for(var i=0;i<arts.length;i++){
-      var r=state[arts[i].id];
+      var r=S.progress[arts[i].id];
       if(r&&r.s==='correct'){ cur++; if(cur>best) best=cur; } else { cur=0; }
     }
     return best;
@@ -193,7 +200,7 @@ window.addEventListener('unhandledrejection', function(event){
       var tot=0,ok=0,done=0;
       for(var i=0;i<arts.length;i++){
         if(arts[i].classList.contains(c.k)){
-          tot++; var r=state[arts[i].id];
+          tot++; var r=S.progress[arts[i].id];
           if(r){ done++; if(r.s==='correct') ok++; }
         }
       }
@@ -209,7 +216,7 @@ window.addEventListener('unhandledrejection', function(event){
 
   function render(){
     var ok=0,ng=0;
-    for(var i=0;i<arts.length;i++){ var r=state[arts[i].id]; if(r){ if(r.s==='correct') ok++; else if(r.s==='wrong') ng++; } }
+    for(var i=0;i<arts.length;i++){ var r=S.progress[arts[i].id]; if(r){ if(r.s==='correct') ok++; else if(r.s==='wrong') ng++; } }
     var done=ok+ng, rate=done?Math.round(ok/done*100):0;
     setText('prog-rate',rate); setText('prog-done',done);
     setText('st-ok',ok); setText('st-ng',ng); setText('st-todo',TOTAL-done); setText('st-streak',longestCorrect());
@@ -238,15 +245,16 @@ window.addEventListener('unhandledrejection', function(event){
   }
   var search=$('q-search'), st;
   if(search){
-    search.addEventListener('input',function(){ if(focusOn) exitFocus(); if(testMode||testGraded) exitTest(); clearTimeout(st); st=setTimeout(function(){ doSearch(search.value); },120); });
+    search.addEventListener('input',function(){ if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest(); clearTimeout(st); st=setTimeout(function(){ doSearch(search.value); },120); });
   }
   var sx=$('q-search-x');
   if(sx) sx.addEventListener('click',function(){ if(search){ search.value=''; doSearch(''); search.focus(); } });
 
   var modeBtns={ all:$('mode-all'), wrong:$('mode-wrong'), todo:$('mode-todo'), star:$('mode-star') };
   function setMode(m){
-    if(focusOn) exitFocus();
-    if(testMode||testGraded) exitTest();
+    S.mode=m;
+    if(S.focus.on) exitFocus();
+    if(S.test.on||S.test.graded) exitTest();
     document.body.classList.remove('rev-wrong','rev-todo','rev-star');
     if(m==='wrong') document.body.classList.add('rev-wrong');
     else if(m==='todo') document.body.classList.add('rev-todo');
@@ -262,7 +270,7 @@ window.addEventListener('unhandledrejection', function(event){
   var resetBtn=$('mode-reset');
   if(resetBtn) resetBtn.addEventListener('click',function(){
     if(!confirm('学習の進捗記録（正解・不正解）をすべて消去します。よろしいですか？')) return;
-    state={}; save();
+    S.progress={}; save();
     arts.forEach(function(a){
       applyStatus(a,null);
       [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; });
@@ -298,25 +306,25 @@ window.addEventListener('unhandledrejection', function(event){
   }
   var btnShuffle=$('btn-shuffle'), btnSeq=$('btn-seq');
   if(btnShuffle) btnShuffle.addEventListener('click',function(){
-    if(focusOn) exitFocus(); if(testMode||testGraded) exitTest();
+    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
     var pool=arts.slice();
     for(var i=pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
     reorder(pool);
     btnShuffle.classList.add('on'); if(btnSeq) btnSeq.classList.remove('on');
   });
   if(btnSeq) btnSeq.addEventListener('click',function(){
-    if(focusOn) exitFocus(); if(testMode||testGraded) exitTest();
+    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
     reorder(origOrder);
     btnSeq.classList.add('on'); if(btnShuffle) btnShuffle.classList.remove('on');
   });
 
   // ===== 選択肢マップ 一括開閉 =====
-  var cmapOpen=false, btnCmap=$('btn-cmap');
+  var btnCmap=$('btn-cmap');
   if(btnCmap) btnCmap.addEventListener('click',function(){
-    cmapOpen=!cmapOpen;
-    [].forEach.call(document.querySelectorAll('details.cmap'),function(d){ d.open=cmapOpen; });
-    btnCmap.classList.toggle('on',cmapOpen);
-    var sm=btnCmap.querySelector('small'); if(sm) sm.textContent=cmapOpen?'一括で閉じる':'一括で開く';
+    S.cmapOpen=!S.cmapOpen;
+    [].forEach.call(document.querySelectorAll('details.cmap'),function(d){ d.open=S.cmapOpen; });
+    btnCmap.classList.toggle('on',S.cmapOpen);
+    var sm=btnCmap.querySelector('small'); if(sm) sm.textContent=S.cmapOpen?'一括で閉じる':'一括で開く';
   });
 
   // ===== 印刷 / PDF =====
@@ -332,24 +340,24 @@ window.addEventListener('unhandledrejection', function(event){
   }
   function updateResume(){
     if(!btnResume) return;
-    var el=lastSeen&&document.getElementById(lastSeen);
+    var el=S.lastSeen&&document.getElementById(S.lastSeen);
     if(el){ btnResume.style.display='block'; setText('resume-sub', qLabel(el)); }
     else { btnResume.style.display='none'; }
   }
   function recordLast(id){
-    if(id===lastSeen) return;
-    lastSeen=id; safeSetRaw(LAST_KEY,id);
+    if(id===S.lastSeen) return;
+    S.lastSeen=id; safeSetRaw(LAST_KEY,id);
     updateResume();
   }
   if(btnResume) btnResume.addEventListener('click',function(){
-    var el=lastSeen&&document.getElementById(lastSeen);
-    if(el){ if(focusOn) exitFocus(); el.scrollIntoView({block:'start'}); }
+    var el=S.lastSeen&&document.getElementById(S.lastSeen);
+    if(el){ if(S.focus.on) exitFocus(); el.scrollIntoView({block:'start'}); }
   });
   // 「続きから」は最後に解答した／集中モードで見ていた問題を対象にする
   // （recordLast は setStatus・showFocus から呼ばれる。スクロール追従はしない＝再読込でも安定）
 
   // ===== 1問ずつ集中モード =====
-  var focusOn=false, focusList=[], focusIdx=0, btnFocus=$('btn-focus');
+  var btnFocus=$('btn-focus');
   function filtRadio(name){ var r=document.querySelector('input.filter[name="'+name+'"]:checked'); return r?r.id:null; }
   function isEligible(a){
     if(a.classList.contains('hide-search')) return false;
@@ -372,40 +380,40 @@ window.addEventListener('unhandledrejection', function(event){
   function indexOfId(list,id){ for(var i=0;i<list.length;i++){ if(list[i].id===id) return i; } return -1; }
   function showFocus(){
     arts.forEach(function(a){ a.classList.remove('focus-current'); });
-    var cur=focusList[focusIdx]; if(!cur) return;
+    var cur=S.focus.list[S.focus.idx]; if(!cur) return;
     cur.classList.add('focus-current');
-    setText('focus-count',(focusIdx+1)+' / '+focusList.length);
+    setText('focus-count',(S.focus.idx+1)+' / '+S.focus.list.length);
     var pv=$('focus-prev'), nx=$('focus-next');
-    if(pv) pv.disabled=focusIdx<=0;
-    if(nx) nx.disabled=focusIdx>=focusList.length-1;
+    if(pv) pv.disabled=S.focus.idx<=0;
+    if(nx) nx.disabled=S.focus.idx>=S.focus.list.length-1;
     cur.scrollIntoView({block:'start'});
     recordLast(cur.id);
   }
   function enterFocus(startId){
-    focusList=[].slice.call(qwrapEl.querySelectorAll('article.q')).filter(isEligible);
-    if(!focusList.length){ alert('表示できる問題がありません。フィルタや表示モードを確認してください。'); return; }
-    focusOn=true; document.body.classList.add('focus-mode');
+    S.focus.list=[].slice.call(qwrapEl.querySelectorAll('article.q')).filter(isEligible);
+    if(!S.focus.list.length){ alert('表示できる問題がありません。フィルタや表示モードを確認してください。'); return; }
+    S.focus.on=true; document.body.classList.add('focus-mode');
     if(btnFocus){ btnFocus.classList.add('on'); var sm=btnFocus.querySelector('small'); if(sm) sm.textContent='タップで一覧に戻る'; }
-    focusIdx=0;
-    if(startId){ var ix=indexOfId(focusList,startId); if(ix>=0) focusIdx=ix; }
+    S.focus.idx=0;
+    if(startId){ var ix=indexOfId(S.focus.list,startId); if(ix>=0) S.focus.idx=ix; }
     showFocus();
   }
   function exitFocus(){
-    focusOn=false; document.body.classList.remove('focus-mode');
+    S.focus.on=false; document.body.classList.remove('focus-mode');
     arts.forEach(function(a){ a.classList.remove('focus-current'); });
     if(btnFocus){ btnFocus.classList.remove('on'); var sm=btnFocus.querySelector('small'); if(sm) sm.textContent='1問だけ大きく表示'; }
   }
-  if(btnFocus) btnFocus.addEventListener('click',function(){ focusOn?exitFocus():enterFocus(lastSeen); });
+  if(btnFocus) btnFocus.addEventListener('click',function(){ S.focus.on?exitFocus():enterFocus(S.lastSeen); });
   var fp=$('focus-prev'), fn=$('focus-next'), fc=$('focus-close');
-  if(fp) fp.addEventListener('click',function(){ if(focusIdx>0){ focusIdx--; showFocus(); } });
-  if(fn) fn.addEventListener('click',function(){ if(focusIdx<focusList.length-1){ focusIdx++; showFocus(); } });
+  if(fp) fp.addEventListener('click',function(){ if(S.focus.idx>0){ S.focus.idx--; showFocus(); } });
+  if(fn) fn.addEventListener('click',function(){ if(S.focus.idx<S.focus.list.length-1){ S.focus.idx++; showFocus(); } });
   if(fc) fc.addEventListener('click',exitFocus);
-  [].forEach.call(document.querySelectorAll('input.filter'),function(r){ r.addEventListener('change',function(){ if(focusOn) exitFocus(); if(testMode||testGraded) exitTest(); }); });
+  [].forEach.call(document.querySelectorAll('input.filter'),function(r){ r.addEventListener('change',function(){ if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest(); }); });
 
   // ===== 進捗データ バックアップ / 復元 =====
   var btnExport=$('btn-export'), btnImport=$('btn-import'), importFile=$('import-file');
   if(btnExport) btnExport.addEventListener('click',function(){
-    var data={ app:'eiyou291', v:29, progress:state, stars:stars, fs:fs, last:lastSeen, exported:new Date().toISOString() };
+    var data={ app:'eiyou291', v:29, progress:S.progress, stars:S.stars, fs:fs, last:S.lastSeen, exported:new Date().toISOString() };
     var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a'); a.href=url; a.download='eiyou291-progress.json';
@@ -451,17 +459,16 @@ window.addEventListener('unhandledrejection', function(event){
     for(var i=idx-1;i>=0;i--){ if(isEligible(all[i])) return all[i]; } return null;
   }
   function currentArticle(){
-    if(focusOn) return focusList[focusIdx];
+    if(S.focus.on) return S.focus.list[S.focus.idx];
     var all=[].slice.call(qwrapEl.querySelectorAll('article.q'));
     for(var i=0;i<all.length;i++){ var a=all[i]; if(a.offsetParent===null) continue; if(a.getBoundingClientRect().bottom>120) return a; }
     return null;
   }
 
   // ===== テスト（模試）モード =====
-  var testMode=false, testGraded=false, testList=[], testAnswers={};
   var btnTest=$('btn-test'), testSetup=$('test-setup'), testBar=$('test-bar');
   if(btnTest) btnTest.addEventListener('click',function(){
-    if(testMode||testGraded){ exitTest(); return; }
+    if(S.test.on||S.test.graded){ exitTest(); return; }
     var show = testSetup.style.display==='none';
     testSetup.style.display = show?'block':'none';
     btnTest.classList.toggle('on',show);
@@ -471,64 +478,64 @@ window.addEventListener('unhandledrejection', function(event){
   });
   function eligiblePool(){ return [].slice.call(qwrapEl.querySelectorAll('article.q')).filter(isEligible); }
   function startTest(n){
-    if(focusOn) exitFocus();
+    if(S.focus.on) exitFocus();
     var pool=eligiblePool();
     if(!pool.length){ alert('出題できる問題がありません。フィルタや表示モードを確認してください。'); return; }
     for(var i=pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
     if(n>0) pool=pool.slice(0,n);
-    testList=pool; testAnswers={};
+    S.test.list=pool; S.test.answers={};
     arts.forEach(function(a){ a.classList.remove('in-test'); });
-    testList.forEach(function(a){ a.classList.add('in-test'); [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; }); });
-    var rest=arts.filter(function(a){ return testList.indexOf(a)<0; });
-    reorder(testList.concat(rest));
-    testMode=true; testGraded=false;
+    S.test.list.forEach(function(a){ a.classList.add('in-test'); [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; }); });
+    var rest=arts.filter(function(a){ return S.test.list.indexOf(a)<0; });
+    reorder(S.test.list.concat(rest));
+    S.test.on=true; S.test.graded=false;
     document.body.classList.add('test-mode'); document.body.classList.remove('test-graded','rev-wrong','rev-todo','rev-star');
     if(testSetup) testSetup.style.display='none'; if(btnTest) btnTest.classList.remove('on');
     buildTestBar();
-    window.scrollTo(0,0); testList[0].scrollIntoView({block:'start'});
+    window.scrollTo(0,0); S.test.list[0].scrollIntoView({block:'start'});
     updateTestBar();
   }
   function buildTestBar(){
     if(!testBar) return;
-    testBar.innerHTML='<span class="ti">未回答 <b id="t-remain">0</b> / <span id="t-total">'+testList.length+'</span> 問</span>'
+    testBar.innerHTML='<span class="ti">未回答 <b id="t-remain">0</b> / <span id="t-total">'+S.test.list.length+'</span> 問</span>'
       +'<button id="t-grade" class="primary" type="button">採点する</button>'
       +'<button id="t-quit" type="button">終了</button>';
     var g=$('t-grade'), q=$('t-quit');
     if(g) g.onclick=gradeTest; if(q) q.onclick=exitTest;
   }
   function updateTestBar(){
-    if(!testMode||testGraded) return;
-    var ans=0; testList.forEach(function(a){ if(testAnswers[a.id]) ans++; });
-    setText('t-remain', testList.length-ans);
+    if(!S.test.on||S.test.graded) return;
+    var ans=0; S.test.list.forEach(function(a){ if(S.test.answers[a.id]) ans++; });
+    setText('t-remain', S.test.list.length-ans);
   }
   function gradeTest(){
     var ok=0;
-    testList.forEach(function(a){
-      var chosen=testAnswers[a.id]; var ce=a.querySelector('input.ans.correct');
+    S.test.list.forEach(function(a){
+      var chosen=S.test.answers[a.id]; var ce=a.querySelector('input.ans.correct');
       var corr = !!(chosen && ce && chosen===ce.id);
       if(corr) ok++;
-      if(chosen){ state[a.id]={s:corr?'correct':'wrong',c:chosen}; applyStatus(a,corr?'correct':'wrong'); }
+      if(chosen){ S.progress[a.id]={s:corr?'correct':'wrong',c:chosen}; applyStatus(a,corr?'correct':'wrong'); }
     });
-    if(testList[0]) recordLast(testList[0].id);
+    if(S.test.list[0]) recordLast(S.test.list[0].id);
     save(); render();
-    testMode=false; testGraded=true;
+    S.test.on=false; S.test.graded=true;
     document.body.classList.remove('test-mode'); document.body.classList.add('test-graded');
-    var rate=testList.length?Math.round(ok/testList.length*100):0;
+    var rate=S.test.list.length?Math.round(ok/S.test.list.length*100):0;
     if(testBar){
-      testBar.innerHTML='<span class="tg">結果：'+ok+' / '+testList.length+' 正解（'+rate+'%）</span>'
+      testBar.innerHTML='<span class="tg">結果：'+ok+' / '+S.test.list.length+' 正解（'+rate+'%）</span>'
         +'<button id="t-review" type="button">間違いだけ復習</button>'
         +'<button id="t-quit2" class="primary" type="button">終了</button>';
       var rv=$('t-review'), q2=$('t-quit2');
       if(rv) rv.onclick=function(){ exitTest(); setMode('wrong'); };
       if(q2) q2.onclick=exitTest;
     }
-    window.scrollTo(0,0); if(testList[0]) testList[0].scrollIntoView({block:'start'});
+    window.scrollTo(0,0); if(S.test.list[0]) S.test.list[0].scrollIntoView({block:'start'});
   }
   function exitTest(){
-    testMode=false; testGraded=false;
+    S.test.on=false; S.test.graded=false;
     document.body.classList.remove('test-mode','test-graded');
     arts.forEach(function(a){ a.classList.remove('in-test'); });
-    testAnswers={};
+    S.test.answers={};
     if(btnTest) btnTest.classList.remove('on');
     if(testSetup) testSetup.style.display='none';
     reorder(origOrder);
@@ -540,7 +547,7 @@ window.addEventListener('unhandledrejection', function(event){
     var ae=document.activeElement;
     if(ae && ((ae.tagName==='INPUT' && ae.type!=='radio') || ae.tagName==='TEXTAREA' || ae.isContentEditable)) return;
     if(e.metaKey||e.ctrlKey||e.altKey) return;
-    if(testGraded) return; // 採点結果の表示中はキー操作を無効化
+    if(S.test.graded) return; // 採点結果の表示中はキー操作を無効化
     if(e.key>='1'&&e.key<='5'){
       var a=currentArticle(); if(!a) return;
       var labs=a.querySelectorAll('.choices label.choice');
@@ -548,12 +555,12 @@ window.addEventListener('unhandledrejection', function(event){
       var inp=document.getElementById(lab.getAttribute('for'));
       if(inp){ inp.checked=true; inp.dispatchEvent(new Event('change',{bubbles:true})); e.preventDefault(); }
     } else if(e.key==='ArrowRight'){
-      if(testMode) return;
-      if(focusOn){ if(focusIdx<focusList.length-1){ focusIdx++; showFocus(); e.preventDefault(); } }
+      if(S.test.on) return;
+      if(S.focus.on){ if(S.focus.idx<S.focus.list.length-1){ S.focus.idx++; showFocus(); e.preventDefault(); } }
       else { var a2=currentArticle(); if(a2){ var nx=nextAfter(a2); if(nx){ nx.scrollIntoView({block:'start'}); e.preventDefault(); } } }
     } else if(e.key==='ArrowLeft'){
-      if(testMode) return;
-      if(focusOn){ if(focusIdx>0){ focusIdx--; showFocus(); e.preventDefault(); } }
+      if(S.test.on) return;
+      if(S.focus.on){ if(S.focus.idx>0){ S.focus.idx--; showFocus(); e.preventDefault(); } }
       else { var a3=currentArticle(); if(a3){ var pv=prevBefore(a3); if(pv){ pv.scrollIntoView({block:'start'}); e.preventDefault(); } } }
     }
   });
