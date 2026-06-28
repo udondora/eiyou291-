@@ -108,6 +108,16 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 
 
 /* v7 additions */
+/* 【資料】表のレンダリング */
+.rsrc{margin:10px 0 4px;border:1px solid var(--bd);border-radius:12px;background:rgba(2,6,23,.5);padding:10px 12px}
+.rsrc-cap{font-weight:900;font-size:13px;color:#7dd3fc;margin-bottom:8px;line-height:1.5}
+.rsrc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rtable{border-collapse:collapse;min-width:100%;font-size:12.5px;font-weight:700}
+.rtable th,.rtable td{border:1px solid var(--bd);padding:6px 9px;text-align:right;white-space:nowrap}
+.rtable thead th{background:rgba(56,189,248,.12);color:#e0f2fe;text-align:center}
+.rtable tbody th{text-align:left;color:#e0f2fe;background:rgba(148,163,184,.08);font-weight:800}
+.rsrc-note{font-size:11px;color:var(--muted);font-weight:700;margin-top:6px;line-height:1.55}
+@media print{.rsrc{background:#fff!important}.rtable th,.rtable td{border-color:#999!important;color:#000!important}.rtable thead th{background:#eef!important;color:#000!important}.rtable tbody th{background:#f3f4f6!important;color:#000!important}}
 /* 参考・暗記・図解をまとめる親アコーディオン（ファーストビューのごちゃつき解消） */
 .refbundle{border:1px solid var(--bd);border-radius:14px;background:rgba(23,32,51,.5);margin:12px 0;padding:0 12px}
 .refbundle>summary{cursor:pointer;font-weight:900;font-size:14px;color:var(--ac);padding:13px 2px;list-style:none}

@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v47'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v48'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -132,6 +132,46 @@ window.addEventListener('unhandledrejection', function(event){
     cw.parentNode.insertBefore(det, cw.nextSibling);
   }
 
+  // ===== 【資料】表の表組み化（既存データの並べ替えのみ。数値は原文どおり） =====
+  // 元データが完全に揃っている問題だけを対象に、縦羅列を正しい表に変換する。
+  var TABLES = {
+    'q40-3': { caption:'ある年の人口動態統計の出生数と死亡数等', headers:['区分','実数'], rowHeader:true,
+      rows:[['出生（人）','770,759'],['死産（胎）','15,179'],['妊娠満22週以後の死産（胎）','2,061'],['早期新生児死亡（人）','466'],['新生児死亡（人）','609'],['乳児死亡（人）','1,356']] },
+    'q40-67': { caption:'牛リブロース100g当たりの鉄量と調理による重量変化率', headers:['食品名','鉄（mg）','重量変化率（％）'], rowHeader:true,
+      rows:[['リブロース 脂身つき 生','1.0','－'],['リブロース 脂身つき 焼き','1.4','70※']],
+      notes:['※調理方法（概要）：厚さ0.2cm薄切り、焼き（電気ロースター）','日本食品標準成分表2020年版（八訂）からの抜粋'] },
+    'q40-91': { caption:'男子Ａと女子Ｂの身長（cm）', headers:['','９歳','10歳','11歳','12歳','13歳','14歳'], rowHeader:true,
+      rows:[['男子Ａ（４月生まれ）','132.0','137.0','142.5','149.0','157.5','164.0'],['女子Ｂ（４月生まれ）','133.5','138.0','145.5','150.5','154.5','156.0']] },
+    'q39-66': { caption:'オレンジピーマン（果実・生）可食部100g当たりのビタミンA量（µg）', headers:['レチノール','α-カロテン','β-カロテン','β-クリプトキサンチン'], rowHeader:false,
+      rows:[['－','150','420','290']], notes:['日本食品標準成分表2020年版（八訂）からの抜粋'] },
+    'q38-3': { caption:'A地域とB地域における年齢3区分別人口構成割合（％）', headers:['地域','総数','年少人口','生産年齢人口','老年人口'], rowHeader:true,
+      rows:[['A','100.0','12.5','62.5','25.0'],['B','100.0','10.0','60.0','30.0']] },
+    'q38-67': { caption:'うどん100g当たりに含まれる食塩相当量および調理による重量変化率※1', headers:['食品名','食塩相当量（g）','重量変化率（％）'], rowHeader:true,
+      rows:[['うどん 生','2.5','-'],['うどん ゆで','0.3','180※2']],
+      notes:['※1 日本食品標準成分表2020年版（八訂）からの抜粋','※2 調理方法（概要）：10倍量の湯を用いてゆで→湯切り'] },
+    'q38-85': { caption:'成長に伴う組織増加分のエネルギー（エネルギー蓄積量）　女子（12〜14歳）', headers:['項目','値'], rowHeader:true,
+      rows:[['参照体重（kg）','47.5'],['基礎代謝基準値（kcal/kg体重/日）','29.6'],['体重増加量（kg/年）','3.0'],['エネルギー密度（kcal/g）','3.0'],['エネルギー蓄積量（kcal/日）','ａ']],
+      notes:['日本人の食事摂取基準（2020年版）を一部改変'] }
+  };
+  function renderTables(){
+    for(var qid in TABLES){
+      if(!TABLES.hasOwnProperty(qid)) continue;
+      var art=document.getElementById(qid); if(!art) continue;
+      var qt=art.querySelector('.qt'); if(!qt) continue;
+      var html=qt.innerHTML, idx=html.indexOf('【資料】');
+      var stem = idx>=0 ? html.slice(0,idx) : html;
+      var sp=TABLES[qid];
+      var t='<div class="rsrc"><div class="rsrc-cap">【資料】'+escapeHtml(sp.caption)+'</div><div class="rsrc-scroll"><table class="rtable">';
+      if(sp.headers){ t+='<thead><tr>'; sp.headers.forEach(function(h){ t+='<th>'+escapeHtml(h)+'</th>'; }); t+='</tr></thead>'; }
+      t+='<tbody>';
+      sp.rows.forEach(function(r){ t+='<tr>'; r.forEach(function(c,ci){ var tg=(ci===0&&sp.rowHeader)?'th':'td'; t+='<'+tg+'>'+escapeHtml(c)+'</'+tg+'>'; }); t+='</tr>'; });
+      t+='</tbody></table></div>';
+      if(sp.notes) sp.notes.forEach(function(n){ t+='<div class="rsrc-note">'+escapeHtml(n)+'</div>'; });
+      t+='</div>';
+      qt.innerHTML = stem + t;
+    }
+  }
+
   arts.forEach(function(a){
     // 検索用テキスト（設問＋テーマ＋選択肢）
     var parts=[];
@@ -188,6 +228,8 @@ window.addEventListener('unhandledrejection', function(event){
     });
     a.appendChild(nb);
   });
+
+  renderTables(); // 【資料】の縦羅列を正しい表に変換（データが揃っている問題のみ）
 
   function setStatus(a,s,cid){
     if(s){ S.progress[a.id]={s:s,c:cid}; recordLast(a.id); } else { delete S.progress[a.id]; }
