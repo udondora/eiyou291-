@@ -1,12 +1,12 @@
 {
-  "version": "v53",
+  "version": "v54",
   "build": "20260628",
   "entry": "index.html",
-  "app": "app.js?v=53",
-  "css": "app.css?v=53",
-  "sw": "eiyou291-v53-20260628",
+  "app": "app.js?v=54",
+  "css": "app.css?v=54",
+  "sw": "eiyou291-v54-20260628",
   "start_url": "./",
-  "questions": 294,
+  "questions": 304,
   "features": {
     "range": "?range=40-85（出題順の通し番号で範囲表示・共有）",
     "deeplink": "#q40-85（第40回問85へスクロール）",
