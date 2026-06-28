@@ -267,6 +267,12 @@ body.no-hits .noresult{display:block}
 .shufbtn.honbn{border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.10);color:#fde68a}
 .shufbtn.honbn small{color:#fcd9a5}
 @media print{.shufbar{display:none}}
+/* 範囲表示バー（?range=40-85） */
+.range-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 2px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.12);color:#fde68a;border-radius:11px;padding:9px 12px;font-size:13px;font-weight:850;line-height:1.4}
+.range-bar .range-clear{flex:0 0 auto;border:1px solid rgba(245,158,11,.6);background:rgba(245,158,11,.18);color:#fde68a;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900;cursor:pointer;user-select:none}
+.range-bar .range-clear:active{transform:scale(.99)}
+.q.out-of-range{display:none!important}
+@media print{.range-bar{display:none!important}}
 /* 出題範囲フィルタを折りたたみに */
 .filt{border:1px solid var(--bd);border-radius:14px;background:rgba(23,32,51,.55);margin:14px 0;padding:0 12px}
 .filt>summary{cursor:pointer;font-weight:900;font-size:14px;color:var(--ac);padding:13px 0;list-style:none;user-select:none}

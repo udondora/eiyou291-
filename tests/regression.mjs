@@ -210,6 +210,34 @@ await ctx2.close();
   await ctx6.close();
 }
 
+// 13) 範囲表示 ?range=3-5：出題順3〜5問目だけ表示、解除で全件
+{
+  const ctx7 = await b.newContext({ viewport: { width: 430, height: 1100 } });
+  const p7 = await ctx7.newPage();
+  await p7.goto(fileUrl + '?range=3-5', { waitUntil: 'load' }); await p7.waitForTimeout(400);
+  const visN = await p7.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length);
+  const visIds = await p7.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).map(a => a.id));
+  ok('range shows only positions 3-5', visN === 3 && visIds.join(',') === 'q40-3,q40-4,q40-5', { visN, visIds });
+  const barShown = await p7.evaluate(() => { const e = document.getElementById('range-bar'); return e && e.style.display !== 'none'; });
+  ok('range bar visible', barShown);
+  // 解除で全291件
+  await p7.click('#range-clear'); await p7.waitForTimeout(200);
+  ok('range clear shows all 291', (await p7.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length)) === 291);
+  await ctx7.close();
+}
+
+// 14) 範囲表示は検索と合成される（範囲内かつ一致のみ）
+{
+  const ctx8 = await b.newContext({ viewport: { width: 430, height: 1100 } });
+  const p8 = await ctx8.newPage();
+  await p8.goto(fileUrl + '?range=1-50', { waitUntil: 'load' }); await p8.waitForTimeout(400);
+  const beforeN = await p8.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length);
+  await p8.fill('#q-search', 'インスリン'); await p8.waitForTimeout(300);
+  const afterN = await p8.evaluate(() => [...document.querySelectorAll('article.q')].filter(a => a.offsetParent !== null).length);
+  ok('range composes with search', beforeN === 50 && afterN <= beforeN, { beforeN, afterN });
+  await ctx8.close();
+}
+
 ok('no console/page errors', errors.length === 0, errors);
 
 await b.close();

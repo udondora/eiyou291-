@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v44'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v45'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -47,7 +47,8 @@ window.addEventListener('unhandledrejection', function(event){
     cmapOpen: false,
     shufQ: false,   // 問題順シャッフル ON/OFF
     shufC: false,   // 選択肢シャッフル ON/OFF
-    _qorder: null   // 問題順シャッフルの固定された並び（再適用で崩れないよう保持）
+    _qorder: null,  // 問題順シャッフルの固定された並び（再適用で崩れないよう保持）
+    range: null     // 範囲表示 {from,to}（?range=40-85、出題順の通し番号。共有用）
   };
   function saveStars(){ safeSave(STAR_KEY,S.stars); }
 
@@ -55,6 +56,8 @@ window.addEventListener('unhandledrejection', function(event){
   var TOTAL=arts.length;
   console.info('[EIYOU291]', { appVersion: APP_VERSION, totalQuestions: TOTAL, startUrl: './' });
   var origOrder=arts.slice();
+  // 出題順の通し番号(1..291)。共有リンクの範囲指定はシャッフルに依らず固定にしたいので元の順で確定。
+  origOrder.forEach(function(a,i){ a._pos=i+1; });
   var qwrapEl=TOTAL?arts[0].parentNode:null;
   var CATS=[{k:'cat1',name:'社会・環境と健康'},{k:'cat2',name:'人体・疾病'},{k:'cat3',name:'食べ物と健康'},{k:'cat4',name:'基礎栄養学'},{k:'cat5',name:'応用栄養学'}];
   setText('prog-total',TOTAL); setText('fab-total',TOTAL); setText('st-todo',TOTAL);
@@ -400,6 +403,55 @@ window.addEventListener('unhandledrejection', function(event){
   if(shQ) shQ.addEventListener('click',function(){ setShuffleQ(!S.shufQ); });
   if(shC) shC.addEventListener('click',function(){ setShuffleC(!S.shufC); });
 
+  // ===== 範囲表示（?range=40-85：出題順の通し番号で絞り込み・共有用） =====
+  function parseRangeParam(){
+    var m=/(?:^|[?&])range=(\d+)(?:-(\d+))?(?:&|$)/.exec(location.search);
+    if(!m) return null;
+    var a=parseInt(m[1],10), b=(m[2]!=null && m[2]!=='')?parseInt(m[2],10):a;
+    if(!isFinite(a)||!isFinite(b)) return null;
+    var from=Math.max(1,Math.min(a,b)), to=Math.min(TOTAL,Math.max(a,b));
+    if(from>TOTAL||to<1) return null;
+    return { from:from, to:to };
+  }
+  function stripRange(search){
+    var s=String(search||'').replace(/^\?/,'');
+    var parts=s.split('&').filter(function(kv){ return kv && kv.indexOf('range=')!==0; });
+    return parts.length?('?'+parts.join('&')):'';
+  }
+  function applyRange(){
+    arts.forEach(function(a){
+      var out = !!(S.range && (a._pos<S.range.from || a._pos>S.range.to));
+      a.classList.toggle('out-of-range', out);
+    });
+    document.body.classList.toggle('range-mode', !!S.range);
+    var bar=$('range-bar');
+    if(bar){
+      if(S.range){
+        var lab=$('range-label');
+        if(lab) lab.textContent='出題順 '+S.range.from+'〜'+S.range.to+' 問を表示中（全'+TOTAL+'問）';
+        bar.style.display='';
+      } else bar.style.display='none';
+    }
+    updateVisible();
+  }
+  function setRangeFromUrl(){
+    S.range=parseRangeParam();
+    applyRange();
+    if(S.range){
+      var first=null;
+      for(var i=0;i<origOrder.length;i++){ if(origOrder[i]._pos>=S.range.from){ first=origOrder[i]; break; } }
+      if(first) setTimeout(function(){ first.scrollIntoView({block:'start'}); },80);
+    }
+  }
+  function clearRange(){
+    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
+    S.range=null;
+    try{ history.replaceState(null,'',location.pathname+stripRange(location.search)+location.hash); }catch(e){}
+    applyRange();
+  }
+  var rangeClear=$('range-clear');
+  if(rangeClear) rangeClear.addEventListener('click',clearRange);
+
   // ===== 選択肢マップ 一括開閉 =====
   var btnCmap=$('btn-cmap');
   if(btnCmap) btnCmap.addEventListener('click',function(){
@@ -443,6 +495,7 @@ window.addEventListener('unhandledrejection', function(event){
   function filtRadio(name){ var r=document.querySelector('input.filter[name="'+name+'"]:checked'); return r?r.id:null; }
   function isEligible(a){
     if(a.classList.contains('hide-search')) return false;
+    if(S.range && (a._pos<S.range.from || a._pos>S.range.to)) return false;
     var cl=a.classList, b=document.body.classList;
     if(b.contains('rev-wrong') && !cl.contains('st-wrong')) return false;
     if(b.contains('rev-todo') && (cl.contains('st-correct')||cl.contains('st-wrong'))) return false;
@@ -695,6 +748,9 @@ window.addEventListener('unhandledrejection', function(event){
     }
     updateShuffleUI();
   })();
+
+  // ===== 範囲表示の適用（?range=…） =====
+  setRangeFromUrl();
 
   // ===== 診断オーバーレイ（?debug=1 のときだけ表示） =====
   if(location.search.indexOf('debug=1')!==-1){
