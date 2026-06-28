@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v43'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v44'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -35,6 +35,7 @@ window.addEventListener('unhandledrejection', function(event){
 
   // ★ブックマーク・続きから・文字サイズのキー
   var STAR_KEY='eiyou291_v29_stars', LAST_KEY='eiyou291_v29_last', FS_KEY='eiyou291_v27_fs';
+  var SHUF_KEY='eiyou291_v44_shuf'; // シャッフル設定の保持（問題順 q / 選択肢 c）
   // ===== アプリの状態を1か所に集約（v40） =====
   var S = {
     progress: (function(){ var v=safeLoad(KEY,{}); return isObj(v)?v:{}; })(),
@@ -43,7 +44,10 @@ window.addEventListener('unhandledrejection', function(event){
     mode:  'all',
     focus: { on:false, list:[], idx:0 },
     test:  { on:false, graded:false, list:[], answers:{} },
-    cmapOpen: false
+    cmapOpen: false,
+    shufQ: false,   // 問題順シャッフル ON/OFF
+    shufC: false,   // 選択肢シャッフル ON/OFF
+    _qorder: null   // 問題順シャッフルの固定された並び（再適用で崩れないよう保持）
   };
   function saveStars(){ safeSave(STAR_KEY,S.stars); }
 
@@ -301,26 +305,100 @@ window.addEventListener('unhandledrejection', function(event){
   if(fsp) fsp.addEventListener('click',function(){ if(fs<4){ fs++; applyFs(); } });
   applyFs();
 
-  // ===== シャッフル / 順番に戻す =====
+  // ===== シャッフル（問題順 / 選択肢） / 順番に戻す =====
   function reorder(list){
     if(!qwrapEl) return;
     var frag=document.createDocumentFragment();
     list.forEach(function(a){ frag.appendChild(a); });
     qwrapEl.appendChild(frag);
   }
-  var btnShuffle=$('btn-shuffle'), btnSeq=$('btn-seq');
-  if(btnShuffle) btnShuffle.addEventListener('click',function(){
-    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
-    var pool=arts.slice();
+
+  // --- 問題順 ---
+  function buildQOrder(){
+    var pool=origOrder.slice();
     for(var i=pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
-    reorder(pool);
-    btnShuffle.classList.add('on'); if(btnSeq) btnSeq.classList.remove('on');
-  });
-  if(btnSeq) btnSeq.addEventListener('click',function(){
+    S._qorder=pool;
+  }
+  function applyQuestionOrder(){
+    if(S.shufQ){ if(!S._qorder||S._qorder.length!==origOrder.length) buildQOrder(); reorder(S._qorder); }
+    else reorder(origOrder);
+  }
+
+  // --- 選択肢（各問の選択肢の「並び順」だけ入れ替える。番号や解説テキストは原文のまま）---
+  // 1選択肢＝[input.ans, label.choice, div.why?] の組。クリア/フィードバックは末尾に固定。
+  function collectChoiceInfo(a){
+    if(a._cinfo!==undefined) return a._cinfo;
+    var cw=a.querySelector('.choices'); if(!cw){ a._cinfo=null; return null; }
+    var groups=[], cur=null;
+    [].forEach.call(cw.children,function(node){
+      if(node.tagName==='INPUT' && node.classList.contains('ans')){
+        if(node.classList.contains('clear')){ cur=null; return; }
+        cur=[node]; groups.push(cur);
+      } else if(cur && (node.classList.contains('choice')||node.classList.contains('why'))){
+        cur.push(node);
+      } else { cur=null; }
+    });
+    a._cinfo = groups.length>=2 ? { cw:cw, groups:groups, anchor:(cw.querySelector('input.ans.clear')||null) } : null;
+    return a._cinfo;
+  }
+  function applyChoiceOrder(a, order){
+    var info=collectChoiceInfo(a); if(!info) return;
+    order.forEach(function(gi){
+      var g=info.groups[gi]; if(!g) return;
+      g.forEach(function(n){ info.cw.insertBefore(n, info.anchor); });
+    });
+  }
+  function shuffleOneChoices(a){
+    var info=collectChoiceInfo(a); if(!info) return;
+    var n=info.groups.length, order=[],i;
+    for(i=0;i<n;i++) order.push(i);
+    for(i=n-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=order[i]; order[i]=order[j]; order[j]=t; }
+    applyChoiceOrder(a, order);
+  }
+  function restoreOneChoices(a){
+    var info=collectChoiceInfo(a); if(!info) return;
+    var order=[]; for(var i=0;i<info.groups.length;i++) order.push(i);
+    applyChoiceOrder(a, order);
+  }
+  function shuffleAllChoices(){ arts.forEach(shuffleOneChoices); }
+  function restoreAllChoices(){ arts.forEach(restoreOneChoices); }
+
+  // --- 共通：UI同期・保存 ---
+  function updateShuffleUI(){
+    var sq=$('sh-q'), sc=$('sh-c'), bs=$('btn-shuffle'), bq=$('btn-seq');
+    if(sq){ sq.classList.toggle('on',S.shufQ); sq.setAttribute('aria-pressed',S.shufQ?'true':'false'); }
+    if(sc){ sc.classList.toggle('on',S.shufC); sc.setAttribute('aria-pressed',S.shufC?'true':'false'); }
+    if(bs) bs.classList.toggle('on',S.shufQ);
+    if(bq) bq.classList.toggle('on',!S.shufQ && !S.shufC);
+  }
+  function persistShuf(){ safeSave(SHUF_KEY,{ q:S.shufQ?1:0, c:S.shufC?1:0 }); }
+
+  function setShuffleQ(on){
     if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
-    reorder(origOrder);
-    btnSeq.classList.add('on'); if(btnShuffle) btnShuffle.classList.remove('on');
-  });
+    S.shufQ=!!on; if(S.shufQ) buildQOrder();
+    applyQuestionOrder(); persistShuf(); updateShuffleUI(); updateVisible();
+  }
+  function setShuffleC(on){
+    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
+    S.shufC=!!on;
+    if(S.shufC) shuffleAllChoices(); else restoreAllChoices();
+    persistShuf(); updateShuffleUI();
+  }
+  function shuffleResetAll(){
+    if(S.focus.on) exitFocus(); if(S.test.on||S.test.graded) exitTest();
+    S.shufQ=false; S.shufC=false;
+    applyQuestionOrder(); restoreAllChoices();
+    persistShuf(); updateShuffleUI(); updateVisible();
+  }
+
+  // 既存（⚙ツール内）ボタン：後方互換のため維持しつつ新仕組みに接続
+  var btnShuffle=$('btn-shuffle'), btnSeq=$('btn-seq');
+  if(btnShuffle) btnShuffle.addEventListener('click',function(){ setShuffleQ(true); });
+  if(btnSeq) btnSeq.addEventListener('click',shuffleResetAll);
+  // 新（目立つ）トグル
+  var shQ=$('sh-q'), shC=$('sh-c'), shHon=$('sh-honban');
+  if(shQ) shQ.addEventListener('click',function(){ setShuffleQ(!S.shufQ); });
+  if(shC) shC.addEventListener('click',function(){ setShuffleC(!S.shufC); });
 
   // ===== 選択肢マップ 一括開閉 =====
   var btnCmap=$('btn-cmap');
@@ -501,6 +579,14 @@ window.addEventListener('unhandledrejection', function(event){
   [].forEach.call(document.querySelectorAll('.tcount'),function(b){
     b.addEventListener('click',function(){ startTest(parseInt(b.getAttribute('data-n'),10)); });
   });
+  // 本番モード：問題順＋選択肢を両方シャッフルして、表示対象から模試（全問）を開始
+  function startHonban(){
+    S.shufC=true; shuffleAllChoices();
+    S.shufQ=true; buildQOrder();
+    persistShuf(); updateShuffleUI();
+    startTest(0);
+  }
+  if(shHon) shHon.addEventListener('click',startHonban);
   function eligiblePool(){ return [].slice.call(qwrapEl.querySelectorAll('article.q')).filter(isEligible); }
   function startTest(n){
     if(S.focus.on) exitFocus();
@@ -570,7 +656,7 @@ window.addEventListener('unhandledrejection', function(event){
     S.test.answers={};
     if(btnTest) btnTest.classList.remove('on');
     if(testSetup) testSetup.style.display='none';
-    reorder(origOrder);
+    applyQuestionOrder(); // 模試前のシャッフル設定（問題順）を保ったまま戻す
     updateVisible();
   }
 
@@ -599,6 +685,16 @@ window.addEventListener('unhandledrejection', function(event){
 
   updateResume();
   render();
+
+  // ===== 保存済みシャッフル設定の復元（リロード後も並びをランダムに保つ） =====
+  (function(){
+    var sp=safeLoad(SHUF_KEY,null);
+    if(isObj(sp)){
+      if(sp.c){ S.shufC=true; shuffleAllChoices(); }
+      if(sp.q){ S.shufQ=true; buildQOrder(); applyQuestionOrder(); }
+    }
+    updateShuffleUI();
+  })();
 
   // ===== 診断オーバーレイ（?debug=1 のときだけ表示） =====
   if(location.search.indexOf('debug=1')!==-1){

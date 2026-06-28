@@ -171,6 +171,45 @@ await ctx2.close();
   await ctx4.close();
 }
 
+// 11) 選択肢シャッフル：並びは変わるが、正解判定（class）と番号→解説の対応は壊れない
+{
+  const ctx5 = await b.newContext({ viewport: { width: 430, height: 1100 } });
+  const p5 = await ctx5.newPage();
+  await p5.goto(fileUrl, { waitUntil: 'load' }); await p5.waitForTimeout(300);
+  const before = await p5.evaluate(() => [...document.querySelectorAll('#q40-1 .choices label.choice .num')].map(n => n.textContent.trim()).join(''));
+  await p5.click('#sh-c'); await p5.waitForTimeout(150);
+  const after = await p5.evaluate(() => [...document.querySelectorAll('#q40-1 .choices label.choice .num')].map(n => n.textContent.trim()).join(''));
+  // 全291問のうち1問でも見た目順が変われば成功（全問そのままの確率は極小）
+  const anyChanged = await p5.evaluate(() => [...document.querySelectorAll('article.q')].some(a => {
+    const nums = [...a.querySelectorAll('.choices label.choice .num')].map(n => +n.textContent.trim());
+    return nums.some((v, i) => v !== i + 1);
+  }));
+  ok('choice shuffle reorders options', anyChanged, { before, after });
+  // 正解の選択肢を選ぶと「正解」になる（class基準なので並び替えても壊れない）
+  await p5.evaluate(() => { const e = document.querySelector('#q40-1 input.ans.correct'); e.checked = true; e.dispatchEvent(new Event('change', { bubbles: true })); });
+  await p5.waitForTimeout(120);
+  ok('correct still correct after choice shuffle', (await p5.evaluate(() => document.getElementById('st-ok').textContent)) === '1');
+  // シャッフル設定が保存され、リロード後も維持される
+  await p5.reload({ waitUntil: 'load' }); await p5.waitForTimeout(400);
+  ok('choice shuffle persists after reload', await p5.evaluate(() => document.getElementById('sh-c').classList.contains('on')));
+  await ctx5.close();
+}
+
+// 12) 選択肢シャッフルOFFで元の順（1,2,3,4,5）に戻る
+{
+  const ctx6 = await b.newContext({ viewport: { width: 430, height: 1100 } });
+  const p6 = await ctx6.newPage();
+  await p6.goto(fileUrl, { waitUntil: 'load' }); await p6.waitForTimeout(300);
+  await p6.click('#sh-c'); await p6.waitForTimeout(150);       // ON
+  await p6.click('#sh-c'); await p6.waitForTimeout(150);       // OFF
+  const restored = await p6.evaluate(() => [...document.querySelectorAll('article.q')].every(a => {
+    const nums = [...a.querySelectorAll('.choices label.choice .num')].map(n => +n.textContent.trim());
+    return nums.every((v, i) => v === i + 1);
+  }));
+  ok('choice shuffle OFF restores original order', restored);
+  await ctx6.close();
+}
+
 ok('no console/page errors', errors.length === 0, errors);
 
 await b.close();
