@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v68'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v69'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
