@@ -1,0 +1,11 @@
+{
+  "version": "v44",
+  "build": "20260628",
+  "entry": "index.html",
+  "app": "app.js?v=44",
+  "css": "app.css?v=44",
+  "sw": "eiyou291-v44-20260628",
+  "start_url": "./",
+  "questions": 291,
+  "note": "公開確認用。ルートが本体(v44)を返しているかの判定に使う。SWキャッシュ対象外なので常にネットワークから最新を取得。"
+}
