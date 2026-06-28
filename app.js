@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v48'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v49'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -151,7 +151,10 @@ window.addEventListener('unhandledrejection', function(event){
       notes:['※1 日本食品標準成分表2020年版（八訂）からの抜粋','※2 調理方法（概要）：10倍量の湯を用いてゆで→湯切り'] },
     'q38-85': { caption:'成長に伴う組織増加分のエネルギー（エネルギー蓄積量）　女子（12〜14歳）', headers:['項目','値'], rowHeader:true,
       rows:[['参照体重（kg）','47.5'],['基礎代謝基準値（kcal/kg体重/日）','29.6'],['体重増加量（kg/年）','3.0'],['エネルギー密度（kcal/g）','3.0'],['エネルギー蓄積量（kcal/日）','ａ']],
-      notes:['日本人の食事摂取基準（2020年版）を一部改変'] }
+      notes:['日本人の食事摂取基準（2020年版）を一部改変'] },
+    'q38-5': { caption:'前向きコホート研究における要因Aの曝露の有無別の観察人年と疾病Bの罹患者数', headers:['曝露','観察人年','罹患者数（人）'], rowHeader:true,
+      rows:[['有','10,000','100'],['無','10,000','50']],
+      notes:['※非曝露群の罹患者数は元データで欠落。公開解説（相対危険2.0）に基づき50で補完しています。要確認。'] }
   };
   function renderTables(){
     for(var qid in TABLES){
