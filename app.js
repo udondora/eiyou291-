@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v41'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v42'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -49,6 +49,7 @@ window.addEventListener('unhandledrejection', function(event){
 
   var arts=[].slice.call(document.querySelectorAll('article.q'));
   var TOTAL=arts.length;
+  console.info('[EIYOU291]', { appVersion: APP_VERSION, totalQuestions: TOTAL, startUrl: './' });
   var origOrder=arts.slice();
   var qwrapEl=TOTAL?arts[0].parentNode:null;
   var CATS=[{k:'cat1',name:'社会・環境と健康'},{k:'cat2',name:'人体・疾病'},{k:'cat3',name:'食べ物と健康'},{k:'cat4',name:'基礎栄養学'},{k:'cat5',name:'応用栄養学'}];
@@ -514,10 +515,17 @@ window.addEventListener('unhandledrejection', function(event){
   function gradeTest(){
     var ok=0;
     S.test.list.forEach(function(a){
-      var chosen=S.test.answers[a.id]; var ce=a.querySelector('input.ans.correct');
+      var chosen=S.test.answers[a.id]||null; var ce=a.querySelector('input.ans.correct');
       var corr = !!(chosen && ce && chosen===ce.id);
       if(corr) ok++;
-      if(chosen){ S.progress[a.id]={s:corr?'correct':'wrong',c:chosen}; applyStatus(a,corr?'correct':'wrong'); }
+      if(chosen){
+        S.progress[a.id]={s:corr?'correct':'wrong',c:chosen};
+      } else {
+        // 未回答は「不正解」として復習対象に残す。ただし既に正解済みの実績は壊さない
+        var prev=S.progress[a.id];
+        if(!(prev && prev.s==='correct')) S.progress[a.id]={s:'wrong',c:''};
+      }
+      applyStatus(a, (S.progress[a.id]||{}).s || null);
     });
     if(S.test.list[0]) recordLast(S.test.list[0].id);
     save(); render();
@@ -575,6 +583,8 @@ window.addEventListener('unhandledrejection', function(event){
   if('serviceWorker' in navigator && (window.isSecureContext || location.hostname==='localhost')){
     try{
       navigator.serviceWorker.register('sw.js').then(function(reg){
+        try{ reg.update(); }catch(e){}
+        setInterval(function(){ try{ reg.update(); }catch(e){} }, 60*60*1000); // 1時間ごとに更新確認
         function showUpdateBar(){
           var bar=$('updbar'); if(bar) bar.classList.add('show');
           var btn=$('upd-btn'); if(btn) btn.onclick=function(){ if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'}); };

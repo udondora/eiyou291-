@@ -149,6 +149,28 @@ await ctx2.close();
   await ctx3.close();
 }
 
+// 10) 模試の未回答は「不正解」として進捗（復習対象）に残る
+{
+  const ctx4 = await b.newContext({ viewport: { width: 430, height: 1100 } });
+  const p4 = await ctx4.newPage();
+  p4.on('dialog', d => d.accept());
+  await p4.goto(fileUrl, { waitUntil: 'load' }); await p4.waitForTimeout(300);
+  await p4.evaluate(() => document.getElementById('tools-acc').open = true);
+  await p4.click('#btn-test'); await p4.waitForTimeout(50);
+  await p4.click('.tcount[data-n="10"]'); await p4.waitForTimeout(200);
+  // 1問だけ正解して、残り9問は未回答のまま採点
+  const firstId = await p4.evaluate(() => {
+    const a = document.querySelector('article.q.in-test');
+    const ce = a.querySelector('input.ans.correct'); ce.checked = true; ce.dispatchEvent(new Event('change', { bubbles: true }));
+    return a.id;
+  });
+  await p4.waitForTimeout(60);
+  await p4.click('#t-grade'); await p4.waitForTimeout(150);
+  const ng = await p4.evaluate(() => +document.getElementById('st-ng').textContent);
+  ok('unanswered test questions become wrong (reviewable)', ng >= 9, { ng });
+  await ctx4.close();
+}
+
 ok('no console/page errors', errors.length === 0, errors);
 
 await b.close();
