@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v72'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v73'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -518,8 +518,7 @@ window.addEventListener('unhandledrejection', function(event){
     cb.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ var row=rowOf(e.target); if(row&&row.getAttribute('data-k')){ e.preventDefault(); drillSubject(row.getAttribute('data-k')); } } });
   })();
 
-  var resetBtn=$('mode-reset');
-  if(resetBtn) resetBtn.addEventListener('click',function(){
+  function doResetProgress(){
     if(!confirm('学習の進捗記録（正解・不正解）をすべて消去します。よろしいですか？')) return;
     S.progress={}; save();
     arts.forEach(function(a){
@@ -528,7 +527,11 @@ window.addEventListener('unhandledrejection', function(event){
       [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; });
     });
     setMode('all'); render();
-  });
+  }
+  var resetBtn=$('mode-reset');
+  if(resetBtn) resetBtn.addEventListener('click',doResetProgress);
+  var clearTop=$('btn-clear');
+  if(clearTop) clearTop.addEventListener('click',doResetProgress);
 
   var fab=$('fab-prog');
   if(fab) fab.addEventListener('click',function(){

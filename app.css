@@ -324,6 +324,10 @@ body.no-hits .noresult{display:block}
 .statline span{flex:1;text-align:center;border:1px solid var(--bd);border-radius:10px;padding:7px 4px;background:var(--sf);font-size:12px;font-weight:900;color:var(--muted)}
 .statline b{font-size:16px;margin-left:3px}
 .statline .ok b{color:var(--ok)} .statline .ng b{color:var(--ng)} .statline .todo b{color:var(--tx)}
+.clearrow{display:flex;justify-content:flex-end;margin:2px 0 4px}
+.clearrec{display:inline-flex;align-items:baseline;gap:6px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.10);color:#fca5a5;border-radius:999px;padding:6px 13px;font-size:12px;font-weight:900;cursor:pointer}
+.clearrec small{font-size:10px;font-weight:700;color:rgba(252,165,165,.8)}
+@media(max-width:420px){.clearrec small{display:none}}
 .modebtns-sm{margin-top:10px}
 .modebtns-sm .mbtn{min-width:0;padding:9px 6px;font-size:13px}
 /* シャッフル（目立つトグル） */
