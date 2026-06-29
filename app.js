@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v70'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v71'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -153,6 +153,43 @@ window.addEventListener('unhandledrejection', function(event){
       if(art.querySelector('.dfig')) return; // 午後は renderPM で挿入済み
       var ans=art.querySelector('.exp .ansline'); if(!ans) return;
       ans.insertAdjacentHTML('afterend', window.__buildFig(window.EIYOU_FIG[key]));
+    });
+  })();
+
+  // 午前（静的HTML）の選択肢解説を、汎用テンプレートから具体解説へ置換する
+  (function injectStaticExp(){
+    if(!window.EIYOU_EXP) return;
+    Object.keys(window.EIYOU_EXP).forEach(function(key){
+      var art=document.getElementById('q'+key); if(!art) return;
+      var map=window.EIYOU_EXP[key];
+      if(map.ok && map.ok.why){
+        var okblk=art.querySelector('.why.why-ok');
+        if(okblk){
+          var v4=okblk.querySelector('.v4pick'); if(v4) v4.remove();
+          var okchk=okblk.querySelector('.checkline'); if(okchk) okchk.innerHTML='<b>なぜ：</b>'+map.ok.why;
+        }
+      }
+      [].forEach.call(art.querySelectorAll('.why.why-ng'),function(blk){
+        var ttl=blk.querySelector('.whytitle'); if(!ttl) return;
+        var m=/選択肢\s*(\d+)/.exec(ttl.textContent||''); if(!m) return;
+        var ent=map[m[1]]; if(!ent) return;
+        var miss=blk.querySelector('.misstype'); if(miss) miss.remove();
+        var chk=blk.querySelector('.checkline');
+        if(chk && ent.why) chk.innerHTML='<b>なぜ：</b>'+ent.why;
+        var cor=blk.querySelector('.correctline');
+        if(ent.fix){ if(cor) cor.innerHTML='<b>正しくは：</b>'+ent.fix; }
+        else if(cor){ cor.remove(); }
+      });
+      // 解説内の「不正解チェック」リストも具体解説へ置換
+      [].forEach.call(art.querySelectorAll('.wrongcheck li'),function(li){
+        var b=li.querySelector('b'); if(!b) return;
+        var m=/×\s*(\d+)/.exec(b.textContent||''); if(!m) return;
+        var ent=map[m[1]]; if(!ent||!ent.why) return;
+        var cw=li.querySelector('.choiceword');
+        var cwHtml=cw?cw.outerHTML:'';
+        var fixHtml=ent.fix?'<span class="fixline"><b>正しくは：</b>'+ent.fix+'</span>':'';
+        li.innerHTML='<b>×'+m[1]+'</b> '+cwHtml+'：'+ent.why+fixHtml;
+      });
     });
   })();
 
