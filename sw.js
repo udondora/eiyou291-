@@ -6,15 +6,15 @@
      （将来コードを分割した際、CSSリクエストにHTMLが返って謎エラーになるのを防ぐ）。
    - 学習の進捗記録は localStorage に保存（このSWは触らない）。
    - 新バージョンは「待機」し、ページ上の「更新」操作でのみ切り替える。 */
-const CACHE = 'eiyou291-v78-20260628';
+const CACHE = 'eiyou291-v79-20260628';
 const ASSETS = [
   './',
   './index.html',   // ルート＝アプリ本体（個別版ファイル名は廃止）
-  './app.css?v=78',
-  './app.js?v=78',
-  './pm.js?v=78',
-  './figs.js?v=78',
-  './exp.js?v=78',
+  './app.css?v=79',
+  './app.js?v=79',
+  './pm.js?v=79',
+  './figs.js?v=79',
+  './exp.js?v=79',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-192.png',
