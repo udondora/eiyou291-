@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v74'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v75'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -158,6 +158,9 @@ window.addEventListener('unhandledrejection', function(event){
     Object.keys(window.EIYOU_EXP).forEach(function(key){
       var art=document.getElementById('q'+key); if(!art) return;
       var map=window.EIYOU_EXP[key];
+      // 重複・汎用テンプレ由来の冗長ブロックを除去（重点解説・詳しい正解解説・間違い選択肢の見抜き方・一言暗記）。
+      // 残すのは 正解→講師メモ（なぜ正解）→落とし穴→不正解チェック（選択肢ごと）のみ。
+      [].forEach.call(art.querySelectorAll('.exp .v4deep, .exp .deepbox, .exp .memoryline'),function(el){ el.remove(); });
       if(map.ok && map.ok.why){
         var okblk=art.querySelector('.why.why-ok');
         if(okblk){
