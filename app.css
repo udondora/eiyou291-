@@ -1,4 +1,4 @@
-:root{--bg:#0f172a;--sf:#172033;--sf2:#1e293b;--bd:#3a4761;--ac:#38bdf8;--blue:#2dd4bf;--red:#ef4444;--tx:#f8fafc;--muted:#a8b3c4;--ok:#22c55e;--ng:#ef4444;--yellow:#f59e0b;--soft:#243044;}
+:root{--bg:#0f172a;--sf:#172033;--sf2:#1e293b;--bd:#3a4761;--ac:#38bdf8;--blue:#2dd4bf;--red:#ef4444;--tx:#f8fafc;--muted:#a8b3c4;--ok:#22c55e;--ng:#ef4444;--ngx:#f87171;--yellow:#f59e0b;--soft:#243044;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic','Noto Sans JP',Arial,sans-serif;line-height:1.65;padding-bottom:env(safe-area-inset-bottom)}
@@ -38,11 +38,11 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 .qt{font-size:15px;font-weight:800;margin-bottom:14px;line-height:1.9}
 /* 選択肢の文中改行は無効化（短文・表なし）。問題文(.qt)はJSで賢く整形する */
 .choice br{display:none}
-.choices{display:grid;gap:11px;position:relative}.ans{position:absolute;opacity:0;pointer-events:none}.choice{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--bd);background:#111827;border-radius:12px;padding:12px 13px;font-size:14px;font-weight:750;line-height:1.65;user-select:none}.num{flex:0 0 24px;width:24px;height:24px;border-radius:999px;border:1.5px solid #5b6b86;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#cbd5e1;margin-top:1px}
+.choices{display:grid;gap:12px;position:relative}.ans{position:absolute;opacity:0;pointer-events:none}.choice{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--bd);background:#111827;border-radius:12px;padding:14px 14px;min-height:48px;box-sizing:border-box;font-size:15px;font-weight:650;line-height:1.65;user-select:none}.num{flex:0 0 24px;width:24px;height:24px;border-radius:999px;border:1.5px solid #5b6b86;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#cbd5e1;margin-top:1px}
 .clearbtn{display:inline-flex;align-items:center;justify-content:center;justify-self:end;width:auto;border:1px solid rgba(148,163,184,.45);background:rgba(148,163,184,.10);color:var(--muted);border-radius:999px;padding:7px 12px;font-size:12px;font-weight:900;cursor:pointer;user-select:none}.clearbtn::before{content:"↺";margin-right:5px;color:var(--yellow)}.ans.clear:checked + .clearbtn{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.10);color:#fde68a}@media(max-width:420px){.clearbtn{justify-self:stretch;width:100%;padding:8px 10px}}
 .ans:checked + .choice{border-color:var(--blue);background:rgba(45,212,191,.10)}.ans.correct:checked + .choice{border-color:var(--ok);background:rgba(34,197,94,.14)}.ans.correct:checked + .choice .num{background:var(--ok);border-color:var(--ok);color:#00110e}.ans.wrong:checked + .choice{border-color:var(--ng);background:rgba(239,68,68,.13)}.ans.wrong:checked + .choice .num{background:var(--ng);border-color:var(--ng);color:white}
 .q:has(.ans:not(.clear):checked) .choice.is-correct{border-color:var(--ok)}.q:has(.ans:not(.clear):checked) .choice.is-correct .num{background:var(--ok);border-color:var(--ok);color:#00110e}
-.fb{display:none;border-radius:10px;padding:9px 11px;font-weight:900;font-size:13px}.ans.correct:checked ~ .okfb{display:block;background:rgba(34,197,94,.13);color:var(--ok)}.ans.wrong:checked ~ .ngfb{display:block;background:rgba(239,68,68,.13);color:var(--ng)}
+.fb{display:none;border-radius:10px;padding:9px 11px;font-weight:900;font-size:13px}.ans.correct:checked ~ .okfb{display:block;background:rgba(34,197,94,.13);color:var(--ok)}.ans.wrong:checked ~ .ngfb{display:block;background:rgba(239,68,68,.13);color:var(--ngx)}
 .exp{margin-top:10px;border:1px solid var(--bd);background:var(--sf2);border-radius:12px;padding:0 11px}.exp summary{padding:10px 0;font-weight:900;color:var(--ac);cursor:pointer}.exp div{border-top:1px solid var(--bd);padding:10px 0 12px;color:var(--tx);font-size:13px;line-height:1.8}
 
 @media(max-width:420px){.title{font-size:28px}.wrap{padding-left:12px;padding-right:12px}.tab{font-size:12px;padding:8px 11px}.tools{grid-template-columns:1fr}}
@@ -99,7 +99,7 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 .wrongcheck .wtitle{font-weight:900;color:var(--yellow);margin-bottom:6px;font-size:13px}
 .wrongcheck ul{margin:0;padding-left:1.2em}
 .wrongcheck li{margin:.45em 0;font-size:12.5px;line-height:1.65;color:#d7dde6}
-.wrongcheck b{color:var(--ng)}
+.wrongcheck b{color:var(--ngx)}
 .wrongcheck .choiceword{color:#fff;font-weight:800}
 
 /* v2: 選択肢ごとの理由表示 */
