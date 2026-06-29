@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v76'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v77'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -158,9 +158,13 @@ window.addEventListener('unhandledrejection', function(event){
     Object.keys(window.EIYOU_EXP).forEach(function(key){
       var art=document.getElementById('q'+key); if(!art) return;
       var map=window.EIYOU_EXP[key];
-      // 重複・汎用テンプレ由来の冗長ブロックを除去（重点解説・詳しい正解解説・間違い選択肢の見抜き方・一言暗記）。
-      // 残すのは 正解→講師メモ（なぜ正解）→落とし穴→不正解チェック（選択肢ごと）のみ。
-      [].forEach.call(art.querySelectorAll('.exp .v4deep, .exp .deepbox, .exp .memoryline'),function(el){ el.remove(); });
+      // 重複・汎用テンプレ由来の冗長ブロックを除去（重点解説・詳しい正解解説・間違い選択肢の見抜き方・
+      // 一言暗記・チェック順（汎用）・ポイント（科目共通の一般論で重複））。
+      // 残すのは 正解→講師メモ（なぜ正解）→落とし穴→注意→不正解チェック（選択肢ごと）のみ。
+      [].forEach.call(art.querySelectorAll('.exp .v4deep, .exp .deepbox, .exp .memoryline, .exp .selectguide, .exp .point'),function(el){ el.remove(); });
+      // 講師メモ先頭の汎用的な前置き（…確認します。…頻出です。等）を除き、具体的な「正解は…」から始める
+      var _lp=art.querySelector('.exp .lecturepoint');
+      if(_lp){ var _h=_lp.innerHTML, _ix=_h.indexOf('正解は'); if(_ix>0) _lp.innerHTML='<b>講師メモ：</b>'+_h.slice(_ix); }
       if(map.ok && map.ok.why){
         var okblk=art.querySelector('.why.why-ok');
         if(okblk){
