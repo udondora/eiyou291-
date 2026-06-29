@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v80'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v81'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -538,41 +538,6 @@ window.addEventListener('unhandledrejection', function(event){
   var clearTop=$('btn-clear');
   if(clearTop) clearTop.addEventListener('click',doResetProgress);
 
-  // ===== コピー機能（共有リンク／問題＋解説のテキスト） =====
-  function copyText(text, btn, doneLabel){
-    var orig = btn ? btn.textContent : '';
-    function done(){ if(btn){ btn.textContent=doneLabel||'✓ コピーしました'; setTimeout(function(){ btn.textContent=orig; },1500); } }
-    function fb(){ try{ var ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.top='-1000px'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }catch(e){} }
-    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, function(){ fb(); done(); }); }
-    else { fb(); done(); }
-  }
-  var copyLinkBtn=$('btn-copylink');
-  if(copyLinkBtn) copyLinkBtn.addEventListener('click',function(){ copyText(location.href, copyLinkBtn); });
-  function buildQuestionText(art){
-    var out=[];
-    var m=art.querySelector('.meta'); if(m) out.push(m.textContent.replace(/\s+/g,' ').trim());
-    var qt=art.querySelector('.qt'); if(qt) out.push(qt.textContent.trim());
-    var chs=[];
-    [].forEach.call(art.querySelectorAll('.choices .choice'),function(c){
-      var num=c.querySelector('.num'); var sp=c.querySelector('span:not(.num)');
-      chs.push('('+(num?num.textContent.trim():'?')+') '+(sp?sp.textContent.trim():''));
-    });
-    if(chs.length){ out.push(''); out.push(chs.join('\n')); }
-    var exp=art.querySelector('.exp');
-    if(exp){ var et=exp.textContent.replace(/^\s*(答え・解説を見る|閉じる|開く)\s*/,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim(); if(et){ out.push(''); out.push(et); } }
-    out.push(''); out.push('— 管理栄養士国試 '+location.origin+location.pathname+'#'+art.id);
-    return out.join('\n');
-  }
-  arts.forEach(function(art){
-    var nav=art.querySelector('.qnav'); if(!nav || nav.querySelector('.copybtn')) return;
-    var b=document.createElement('button'); b.type='button'; b.className='copybtn'; b.textContent='📋 問題と解説をコピー';
-    nav.appendChild(b);
-  });
-  document.addEventListener('click',function(e){
-    var b=e.target && e.target.closest ? e.target.closest('.copybtn') : null; if(!b) return;
-    var art=b.closest('article.q'); if(!art) return;
-    copyText(buildQuestionText(art), b);
-  });
 
   var fab=$('fab-prog');
   if(fab) fab.addEventListener('click',function(){
