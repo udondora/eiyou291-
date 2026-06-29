@@ -90,15 +90,6 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 /* 正解マーク（色だけに頼らず✓＋文字で示す：色覚・印刷・グレースケール共有でも判別可能） */
 .fig-mark{margin-left:auto;flex:0 0 auto;font-size:10px;font-weight:900;color:var(--ok);border:1px solid var(--ok);border-radius:6px;padding:1px 6px;white-space:nowrap;line-height:1.5}
 .fig-barrow .fig-mark{margin-left:6px}
-/* 想起練習モード：正解の手がかりを隠し、ボタンで表示（active recall） */
-.fig-reveal{display:none;margin-top:9px;font-family:inherit;font-size:12px;font-weight:900;color:var(--ac);background:rgba(56,189,248,.12);border:1px solid var(--ac);border-radius:8px;padding:6px 13px;cursor:pointer}
-.dfig.quiz .fig-reveal{display:inline-block}
-.dfig.quiz.shown .fig-reveal{color:var(--muted);border-color:var(--bd);background:transparent}
-.dfig.quiz:not(.shown) .fig-step.hi,.dfig.quiz:not(.shown) .fig-level.hi{border-color:var(--bd);background:var(--sf)}
-.dfig.quiz:not(.shown) .fig-step.hi .fig-tag{background:var(--ac)}
-.dfig.quiz:not(.shown) .fig-bfill.hi{background:var(--blue)}
-.dfig.quiz:not(.shown) .fig-mark{visibility:hidden}
-.dfig.quiz:not(.shown) .fig-foot{display:none}
 .hintbox{border-left:3px solid var(--yellow);background:rgba(245,158,11,.06);padding:8px 9px;border-radius:8px;margin:.45em 0;color:#e6edf3}
 .hintbox strong{color:var(--yellow)}
 

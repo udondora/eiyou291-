@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v73'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v74'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -63,21 +63,19 @@ window.addEventListener('unhandledrejection', function(event){
     function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
     function buildFig(f){
       if(!f||!f.type) return '';
-      var hasAns=false, MK='<span class="fig-mark">✓ 正解</span>';
+      var MK='<span class="fig-mark">✓ 正解</span>';
       var h='';
       if(f.title) h+='<div class="fig-cap">📊 '+esc(f.title)+'</div>';
       if(f.type==='flow'){
         h+='<div class="fig-flow">';
         (f.steps||[]).forEach(function(s,i){
           if(i) h+='<div class="fig-arrow">▼</div>';
-          if(s.hi) hasAns=true;
           h+='<div class="fig-step'+(s.hi?' hi':'')+'">'+(s.tag?'<span class="fig-tag">'+esc(s.tag)+'</span>':'')+'<span class="fig-stext">'+esc(s.t)+'</span>'+(s.hi?MK:'')+(s.note?'<span class="fig-note">'+esc(s.note)+'</span>':'')+'</div>';
         });
         h+='</div>';
       } else if(f.type==='levels'){
         h+='<div class="fig-levels">';
         (f.items||[]).forEach(function(s,i){
-          if(s.hi) hasAns=true;
           h+='<div class="fig-level'+(s.hi?' hi':'')+'"><span class="fig-lvnum">'+(i+1)+'</span><span class="fig-stext">'+esc(s.t)+'</span>'+(s.hi?MK:'')+(s.note?'<span class="fig-note">'+esc(s.note)+'</span>':'')+'</div>';
         });
         h+='</div>';
@@ -91,7 +89,6 @@ window.addEventListener('unhandledrejection', function(event){
         h+='<div class="fig-bars">';
         (f.items||[]).forEach(function(s){
           var v=Math.max(0,Math.min(100,+s.v||0));
-          if(s.hi) hasAns=true;
           h+='<div class="fig-barrow"><span class="fig-blabel">'+esc(s.t)+'</span><span class="fig-btrack"><span class="fig-bfill'+(s.hi?' hi':'')+'" style="width:'+v+'%"></span></span>'+(s.label?'<span class="fig-bval">'+esc(s.label)+'</span>':'')+(s.hi?MK:'')+'</div>';
         });
         h+='</div>';
@@ -104,8 +101,7 @@ window.addEventListener('unhandledrejection', function(event){
         h+='</div><div class="fig-axislabels"><span>'+esc(mn)+'</span><span>'+esc(f.nul)+'（差なし）</span><span>'+esc(mx)+'</span></div></div>';
       }
       if(f.note) h+='<div class="fig-foot">'+esc(f.note)+'</div>';
-      if(hasAns) h+='<button class="fig-reveal" type="button">答えを表示する</button>';
-      return '<div class="dfig'+(hasAns?' has-ans':'')+'">'+h+'</div>';
+      return '<div class="dfig">'+h+'</div>';
     }
     window.__buildFig = buildFig; // 午前の静的問題にも図を挿入できるよう共有
     var html='';
@@ -646,32 +642,6 @@ window.addEventListener('unhandledrejection', function(event){
   var shQ=$('sh-q'), shC=$('sh-c'), shHon=$('sh-honban');
   if(shQ) shQ.addEventListener('click',function(){ setShuffleQ(!S.shufQ); });
   if(shC) shC.addEventListener('click',function(){ setShuffleC(!S.shufC); });
-
-  // ===== 想起練習モード（図の正解を隠し、タップで表示：active recall で記憶定着） =====
-  var RECALL_KEY='eiyou291_recall';
-  var recallOn = safeGetRaw(RECALL_KEY,'0')==='1';
-  function applyRecall(){
-    [].forEach.call(document.querySelectorAll('.dfig.has-ans'),function(d){
-      if(recallOn){ d.classList.add('quiz'); d.classList.remove('shown'); }
-      else { d.classList.remove('quiz'); d.classList.remove('shown'); }
-      var b=d.querySelector('.fig-reveal'); if(b) b.textContent='答えを表示する';
-    });
-    var t=$('sh-recall');
-    if(t){ t.classList.toggle('on',recallOn); t.setAttribute('aria-pressed',recallOn?'true':'false'); }
-  }
-  var shRecall=$('sh-recall');
-  if(shRecall) shRecall.addEventListener('click',function(){
-    recallOn=!recallOn; safeSetRaw(RECALL_KEY, recallOn?'1':'0'); applyRecall();
-  });
-  // 図内の「答えを表示／隠す」ボタン（動的・静的どちらの図でも効くようイベント委譲）
-  document.addEventListener('click',function(e){
-    var b=e.target&&e.target.closest?e.target.closest('.fig-reveal'):null; if(!b) return;
-    var d=b.closest('.dfig'); if(!d) return;
-    var show=!d.classList.contains('shown');
-    d.classList.toggle('shown',show);
-    b.textContent=show?'答えを隠す':'答えを表示する';
-  });
-  applyRecall();
 
   // ===== 範囲表示（?range=40-85：出題順の通し番号で絞り込み・共有用） =====
   function parseRangeParam(){
