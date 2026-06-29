@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v81'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v82'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -759,7 +759,7 @@ window.addEventListener('unhandledrejection', function(event){
     if(df==='f-medium'&&!cl.contains('medium')) return false;
     if(df==='f-hard'&&!cl.contains('hard')) return false;
     var ct=filtRadio('cat');
-    if(ct&&/^f-cat[1-5]$/.test(ct)&&!cl.contains(ct.replace('f-',''))) return false;
+    if(ct&&/^f-cat([1-9]|10)$/.test(ct)&&!cl.contains(ct.replace('f-',''))) return false;
     return true;
   }
   function indexOfId(list,id){ for(var i=0;i<list.length;i++){ if(list[i].id===id) return i; } return -1; }
