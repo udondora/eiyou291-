@@ -87,9 +87,11 @@ window.addEventListener('unhandledrejection', function(event){
       } else if(f.type==='compare'){
         var _rows=f.rows||[], _maxc=0; _rows.forEach(function(r){ if(r.length>_maxc) _maxc=r.length; });
         var _lead = f.head && f.head.length === (_maxc-1); // 先頭列が行見出しのとき空ヘッダを足す
-        h+='<div class="fig-cwrap"><table class="fig-ctable">';
+        // f.hi = 正解に対応する行のindex（0始まり、数値または配列）。指定行を強調して✓を付ける
+        var _hi = (f.hi==null) ? [] : (Array.isArray(f.hi) ? f.hi : [f.hi]);
+        h+='<div class="fig-cwrap"><table class="fig-ctable'+(_hi.length?' has-hi':'')+'">';
         if(f.head){ h+='<thead><tr>'; if(_lead) h+='<th></th>'; f.head.forEach(function(x){ h+='<th>'+esc(x)+'</th>'; }); h+='</tr></thead>'; }
-        h+='<tbody>'; _rows.forEach(function(r){ h+='<tr>'; r.forEach(function(c,ci){ var tg=ci===0?'th':'td'; h+='<'+tg+'>'+esc(c)+'</'+tg+'>'; }); h+='</tr>'; }); h+='</tbody></table></div>';
+        h+='<tbody>'; _rows.forEach(function(r,ri){ var _rhi=_hi.indexOf(ri)>=0; h+='<tr'+(_rhi?' class="fig-rhi"':'')+'>'; r.forEach(function(c,ci){ var tg=ci===0?'th':'td'; h+='<'+tg+'>'+esc(c)+(_rhi&&ci===0?'<span class="fig-rmark">✓</span>':'')+'</'+tg+'>'; }); h+='</tr>'; }); h+='</tbody></table></div>';
       } else if(f.type==='bars'){
         h+='<div class="fig-bars">';
         (f.items||[]).forEach(function(s){

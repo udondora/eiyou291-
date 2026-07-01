@@ -78,6 +78,10 @@ input.filter{position:absolute;opacity:0;pointer-events:none}
 .fig-ctable th,.fig-ctable td{border:1px solid var(--bd);padding:7px 9px;text-align:center;color:var(--tx);min-width:72px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}
 .fig-ctable thead th{background:var(--soft);color:var(--ac);font-weight:900}
 .fig-ctable tbody th{background:var(--sf2);color:var(--muted);font-weight:900;text-align:left;white-space:normal;min-width:100px}
+/* 正解行ハイライト（f.hi指定時）: 緑枠＋淡い緑地で「この行が答え」を一目で示す */
+.fig-ctable tbody tr.fig-rhi>td,.fig-ctable tbody tr.fig-rhi>th{background:rgba(34,197,94,.14);border-color:var(--ok);color:var(--tx)}
+.fig-ctable tbody tr.fig-rhi>th{color:#bbf7d0}
+.fig-rmark{display:inline-block;margin-left:5px;color:var(--ok);font-weight:900}
 .fig-bars{display:flex;flex-direction:column;gap:7px}
 .fig-barrow{display:flex;align-items:center;gap:8px}
 .fig-blabel{flex:0 0 32%;font-size:12px;font-weight:800;color:var(--tx);text-align:right}
