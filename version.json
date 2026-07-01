@@ -1,10 +1,10 @@
 {
-  "version": "v83",
+  "version": "v84",
   "build": "20260629",
   "entry": "index.html",
-  "app": "app.js?v=83",
-  "css": "app.css?v=83",
-  "sw": "eiyou291-v83-20260629",
+  "app": "app.js?v=84",
+  "css": "app.css?v=84",
+  "sw": "eiyou291-v84-20260629",
   "start_url": "./",
   "questions": 600,
   "features": {

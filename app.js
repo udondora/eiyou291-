@@ -8,15 +8,20 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v83'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v84'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
     catch(e){ console.warn('localStorage load failed:', key, e); return fallback; }
   }
+  var _saveFailWarned=false;
   function safeSave(key, value){
     try{ localStorage.setItem(key, JSON.stringify(value)); }
-    catch(e){ console.warn('localStorage save failed:', key, e); }
+    catch(e){
+      console.warn('localStorage save failed:', key, e);
+      // 黙って学習記録が消えるのを防ぐ：保存失敗はセッション中1回だけ画面で知らせる
+      if(!_saveFailWarned){ _saveFailWarned=true; alert('注意：学習記録を保存できませんでした。端末の空き容量やブラウザのサイトデータ設定をご確認ください（このまま解き続けると再読み込みで記録が消える可能性があります）。'); }
+    }
   }
   function safeGetRaw(key, fallback){
     try{ var v=localStorage.getItem(key); return v==null ? fallback : v; }
@@ -179,6 +184,7 @@ window.addEventListener('unhandledrejection', function(event){
         var m=/選択肢\s*(\d+)/.exec(ttl.textContent||''); if(!m) return;
         var ent=map[m[1]]; if(!ent) return;
         var miss=blk.querySelector('.misstype'); if(miss) miss.remove();
+        var vmiss=blk.querySelector('.v4miss'); if(vmiss) vmiss.remove();
         var chk=blk.querySelector('.checkline');
         if(chk && ent.why) chk.innerHTML='<b>なぜ：</b>'+ent.why;
         var cor=blk.querySelector('.correctline');
@@ -788,7 +794,7 @@ window.addEventListener('unhandledrejection', function(event){
     arts.forEach(function(a){ a.classList.remove('focus-current'); });
     if(btnFocus){ btnFocus.classList.remove('on'); var sm=btnFocus.querySelector('small'); if(sm) sm.textContent='1問だけ大きく表示'; }
   }
-  if(btnFocus) btnFocus.addEventListener('click',function(){ S.focus.on?exitFocus():enterFocus(S.lastSeen); });
+  if(btnFocus) btnFocus.addEventListener('click',function(){ if(S.test.on||S.test.graded) exitTest(); S.focus.on?exitFocus():enterFocus(S.lastSeen); });
   var fp=$('focus-prev'), fn=$('focus-next'), fc=$('focus-close');
   if(fp) fp.addEventListener('click',function(){ if(S.focus.idx>0){ S.focus.idx--; showFocus(); } });
   if(fn) fn.addEventListener('click',function(){ if(S.focus.idx<S.focus.list.length-1){ S.focus.idx++; showFocus(); } });
@@ -956,6 +962,14 @@ window.addEventListener('unhandledrejection', function(event){
     S.test.on=false; S.test.graded=false;
     document.body.classList.remove('test-mode','test-graded');
     arts.forEach(function(a){ a.classList.remove('in-test'); });
+    // startTestで消した選択状態を進捗記録から復元する（初期ロードと同じ手順）。
+    // これが無いと、模試中断後に解答済み問題の解説が開けなくなる
+    S.test.list.forEach(function(a){
+      [].forEach.call(a.querySelectorAll('input.ans'),function(inp){ inp.checked=false; });
+      a._sel=null;
+      var rec=S.progress[a.id];
+      if(rec&&rec.c){ var ri=document.getElementById(rec.c); if(ri){ ri.checked=true; a._sel=ri; } }
+    });
     S.test.answers={};
     if(btnTest) btnTest.classList.remove('on');
     if(testSetup) testSetup.style.display='none';
