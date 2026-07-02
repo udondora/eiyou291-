@@ -8,7 +8,7 @@ window.addEventListener('unhandledrejection', function(event){
 
 (function(){
   "use strict";
-  var APP_VERSION='v85'; // 版数はここだけ更新すればよい（ファイル名は固定）
+  var APP_VERSION='v86'; // 版数はここだけ更新すればよい（ファイル名は固定）
   // ===== localStorage 安全ラッパー（失敗しても落とさず警告を出す） =====
   function safeLoad(key, fallback){
     try{ var raw=localStorage.getItem(key); return raw!=null ? JSON.parse(raw) : fallback; }
@@ -134,7 +134,7 @@ window.addEventListener('unhandledrejection', function(event){
         html+='<div class="why '+(isC?'why-ok':'why-ng')+'"><div class="whytitle">'+(isC?'✅ 正解：この文章が正解になる理由':'❌ 選択肢'+k+' は不正解です。')+'</div><div class="checkline"><b>なぜ：</b>'+esc(c.why||'')+'</div>'+((!isC&&c.fix)?'<div class="correctline"><b>正しくは：</b>'+esc(c.fix)+'</div>':'')+'</div>';
       });
       html+='<input class="ans clear" id="'+qid+'-clear" name="'+qid+'" type="radio"/><label class="clearbtn" for="'+qid+'-clear">選択をクリア</label>';
-      html+='<div class="fb okfb">✅ 正解です。選択肢下の理由と、詳しい解説で確認してください。</div><div class="fb ngfb">❌ 違います。選んだ選択肢の下に「なぜ違うか」と正解文を表示しています。</div>';
+      html+='<div class="fb okfb">✅ 正解！</div><div class="fb ngfb">❌ 不正解 — 下の「なぜ」と正解文を確認</div>';
       html+='</div>';
       html+='<details class="exp"><summary>答え・解説を見る</summary><div><p class="ansline"><strong>正解：'+q.ans+'</strong>　'+esc(q.ansText||'')+'</p>';
       var _fig=q.fig||(window.EIYOU_FIG&&window.EIYOU_FIG[q.y+'-'+q.n]); if(_fig) html+=buildFig(_fig);
@@ -432,7 +432,7 @@ window.addEventListener('unhandledrejection', function(event){
 
   function renderCats(){
     var body=$('catstats-body'); if(!body) return;
-    var html='';
+    var html='', totalWrong=0;
     CATS.forEach(function(c){
       var tot=0,ok=0,done=0,wrong=0;
       for(var i=0;i<arts.length;i++){
@@ -455,8 +455,13 @@ window.addEventListener('unhandledrejection', function(event){
           +'<div class="ct"><span>'+c.name+'</span><span><b>'+rateLabel+'</b> （'+ok+'/'+done+'・全'+tot+'）</span></div>'
           +'<div class="catbar"><i class="'+barCls+'" style="width:'+barW+'%"></i></div>'
           +'<div class="catcta">'+cta+'</div></div>';
+      totalWrong+=wrong;
     });
     body.innerHTML=html;
+    // 初期は畳んでおき、復習すべき間違いが出たら弱点克服を自動展開する
+    // （ユーザーが自分で開閉した後はその状態を尊重＝一度だけ自動で開く）
+    var det=$('catstats');
+    if(det && !det.dataset.userToggled){ det.open = totalWrong>0; }
   }
 
   function render(){
@@ -529,6 +534,9 @@ window.addEventListener('unhandledrejection', function(event){
     var rowOf=function(t){ return t&&t.closest?t.closest('.catrow'):null; };
     cb.addEventListener('click',function(e){ var row=rowOf(e.target); if(row&&row.getAttribute('data-k')) drillSubject(row.getAttribute('data-k')); });
     cb.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ var row=rowOf(e.target); if(row&&row.getAttribute('data-k')){ e.preventDefault(); drillSubject(row.getAttribute('data-k')); } } });
+    // 弱点克服をユーザーが自分で開閉したら、以後は自動開閉しない（意思を尊重）
+    var det=$('catstats'), sum=det&&det.querySelector('summary');
+    if(sum) sum.addEventListener('click',function(){ det.dataset.userToggled='1'; });
   })();
 
   function doResetProgress(){
