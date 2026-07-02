@@ -320,7 +320,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
       <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
       <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-      <div class="hs" style="text-align:right">v51<br><span id="build" style="font-weight:700"></span></div>
+      <div class="hs" style="text-align:right">v52<br><span id="build" style="font-weight:700"></span></div>
     </div>
   </div>
   <div class="navbar">
@@ -444,7 +444,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
 
   <!-- テーマ・トラッカー -->
   <div class="card" id="themecard">
-    <details id="themebox">
+    <details id="themebox" open>
       <summary class="fsum">🗺 テーマ・トラッカー <span class="tiny muted">（セクター/テーマの強さランキング）</span></summary>
       <div class="tiny muted" style="margin-top:6px">主要テーマの構成銘柄をまとめて取得し、<b>平均騰落率でランク付け</b>。テーマ内で<b>20日線の上にある銘柄数</b>・<b>新高値接近🔥数</b>とミニ推移も表示。「リーダー銘柄はリーダーテーマから」が王道です。テーマ行をタップで構成銘柄を表示（取得元は上の設定。Twelve Data推奨／初回は数分かかる場合あり）。</div>
       <div class="row" style="margin-top:8px">
@@ -463,6 +463,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
         <div id="th-bklist" class="tiny" style="margin-top:8px"></div>
         <div class="tiny muted" id="th-bknote" style="margin-top:6px"></div>
       </div>
+      <div id="th-map" style="display:none"></div>
       <div id="th-body" style="margin-top:10px"><div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div></div>
     </details>
   </div>
@@ -481,6 +482,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button id="pf-refresh" class="btn">📊 一括更新</button>
       <span class="tiny muted" id="pf-status"></span>
     </div>
+    <div id="pf-summary" style="margin-top:10px"></div>
     <div id="pf-table" style="display:none"><div id="pf-body"></div></div>
     <div class="tiny muted" id="pf-empty" style="margin-top:8px">まだ登録がありません。上で銘柄と取得単価を入れて「＋追加」してください。</div>
   </div>
@@ -1861,6 +1863,7 @@ function addCurrentToWatch(){
 function renderPortfolio(){
   const p=getPortfolio();
   const tbl=document.getElementById('pf-table'), body=document.getElementById('pf-body'), empty=document.getElementById('pf-empty');
+  const sumEl=document.getElementById('pf-summary'); if(sumEl) sumEl.innerHTML=pfSummaryHtml();
   if(!p.length){ tbl.style.display='none'; empty.style.display='block'; return; }
   empty.style.display='none'; tbl.style.display='block';
   body.innerHTML=p.map(h=>{
@@ -2123,6 +2126,7 @@ function renderThemes(){
       `<div class="thdetail" id="thd-${idx}" style="display:none"></div>`;
   }).join('');
   box.querySelectorAll('.thcard').forEach(el=>el.addEventListener('click',()=>toggleThemeDetail(+el.dataset.i)));
+  renderThemeMap();
 }
 function toggleThemeDetail(idx){
   const r=__themeRows[idx], el=document.getElementById('thd-'+idx); if(!r||!el) return;
@@ -2152,6 +2156,68 @@ function toggleThemeDetail(idx){
   }).join('');
   el.style.display='block';
   el.querySelectorAll('.thcard.sub[data-sym]').forEach(c=>c.addEventListener('click',e=>{ e.stopPropagation(); document.getElementById('symbol').value=c.dataset.sym; run(); }));
+}
+
+/* ===== 保有サマリー（合計評価額・含み損益・今日の増減） ===== */
+function pfSummary(){
+  let value=0,cost=0,day=0,withSh=0;
+  getPortfolio().forEach(h=>{
+    const e=pfLast[h.sym]; if(!e||e.err||e.close==null) return;
+    if(h.shares!=null&&h.shares>0){
+      withSh++;
+      value+=e.close*h.shares;
+      if(h.buy!=null) cost+=h.buy*h.shares;
+      const d=themeData[h.sym];
+      if(d&&!d.err&&d.close&&d.close.length>=2) day+=(d.close[d.close.length-1]-d.close[d.close.length-2])*h.shares;
+    }
+  });
+  return {value,cost,pl:value-cost,plPct:cost>0?(value/cost-1)*100:null,day,withSh};
+}
+function pfSummaryHtml(){
+  const ps=pfSummary();
+  if(!ps.withSh) return getPortfolio().length? '<div class="tiny muted">株数を入れて登録すると、合計評価額・含み損益・今日の増減をここに表示します。</div>' : '';
+  const sgn=v=>(v>=0?'+':'')+fmt(v,0);
+  return `<div class="bkgrid" style="grid-template-columns:repeat(3,1fr)">`+
+    `<div class="bkpill"><div class="bn" style="font-size:15px">${fmt(ps.value,0)}</div><div class="bl">評価額（${ps.withSh}銘柄）</div></div>`+
+    `<div class="bkpill ${ps.pl>=0?'pos':'neg'}"><div class="bn" style="font-size:15px">${sgn(ps.pl)}</div><div class="bl">含み損益${ps.plPct!=null?`（${ps.pl>=0?'+':''}${ps.plPct.toFixed(1)}%）`:''}</div></div>`+
+    `<div class="bkpill ${ps.day>=0?'pos':'neg'}"><div class="bn" style="font-size:15px">${sgn(ps.day)}</div><div class="bl">今日の増減</div></div></div>`;
+}
+/* ===== テーマ・ローテーション・マップ（横=1週・縦=3ヶ月） ===== */
+function renderThemeMap(){
+  const box=document.getElementById('th-map'); if(!box) return;
+  const rows=THEMES.map(t=>{ const ds=t.syms.map(s=>themeData[s]).filter(d=>d&&!d.err);
+    const avgOf=fn=>{ const a=ds.map(fn).filter(x=>x!=null); return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; };
+    return {t, x:avgOf(d=>chgOf(d,5)), y:avgOf(d=>chgOf(d,63))};
+  }).filter(r=>r.x!=null&&r.y!=null);
+  if(!rows.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  const W=360,H=280,pad=34;
+  const xm=Math.max(3,...rows.map(r=>Math.abs(r.x)))*1.3;
+  const ym=Math.max(5,...rows.map(r=>Math.abs(r.y)))*1.3;
+  const X=v=>pad+(v+xm)/(2*xm)*(W-2*pad);
+  const Y=v=>H-pad-(v+ym)/(2*ym)*(H-2*pad);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:#0b1220;border:1px solid var(--bd);border-radius:12px">`;
+  svg+=`<rect x="${X(0)}" y="10" width="${W-10-X(0)}" height="${Y(0)-10}" fill="rgba(34,197,94,.07)"/>`;
+  svg+=`<rect x="10" y="${Y(0)}" width="${X(0)-10}" height="${H-10-Y(0)}" fill="rgba(239,68,68,.06)"/>`;
+  svg+=`<line x1="${X(0)}" y1="10" x2="${X(0)}" y2="${H-10}" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 3"/>`;
+  svg+=`<line x1="10" y1="${Y(0)}" x2="${W-10}" y2="${Y(0)}" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 3"/>`;
+  const lab=(x,y,t,anch,col)=>`<text x="${x}" y="${y}" font-size="9.5" font-weight="800" fill="${col||'#7587a0'}" text-anchor="${anch}">${t}</text>`;
+  svg+=lab(W-14,20,'👑 主導','end','#22c55e')+lab(18,20,'⚠️ 失速警戒','start','#f59e0b')+lab(W-14,H-14,'🌱 復活の芽','end','#38bdf8')+lab(18,H-14,'💤 出遅れ','start','#94a3b8');
+  rows.forEach(r=>{
+    const cx=X(r.x).toFixed(1), cy=Y(r.y).toFixed(1);
+    svg+=`<g class="thmap-pt" data-name="${r.t.name}" style="cursor:pointer">`+
+      `<circle cx="${cx}" cy="${cy}" r="7" fill="${r.t.catc||'#22c55e'}" stroke="rgba(255,255,255,.65)" stroke-width="1.2"/>`+
+      `<text x="${cx}" y="${(+cy+17).toFixed(1)}" font-size="9" font-weight="800" fill="#c7d3e4" text-anchor="middle">${r.t.cat}</text></g>`;
+  });
+  svg+='</svg>';
+  box.innerHTML=`<div class="tiny muted" style="margin:12px 0 5px"><b style="color:var(--tx)">🧭 ローテーション・マップ</b>　横=1週・縦=3ヶ月の平均騰落率。右上=主導、左上=中期強いが直近失速、右下=直近から復活、左下=出遅れ。点タップでそのテーマへ。</div>`+svg;
+  box.querySelectorAll('.thmap-pt').forEach(g=>g.addEventListener('click',()=>{
+    const i=__themeRows.findIndex(r=>r.t.name===g.dataset.name); if(i<0) return;
+    const card=document.querySelector(`#th-body .thcard[data-i="${i}"]`);
+    const det=document.getElementById('thd-'+i);
+    if(det&&det.style.display!=='block') toggleThemeDetail(i);
+    if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
+  }));
 }
 
 /* ===== 大幅改訂(v51): 統合更新・ホーム画面・タブSPA ===== */
@@ -2250,12 +2316,13 @@ function renderHome(){
     else if((e.sellAction||'').indexOf('売り')===0) alerts.push({sym:h.sym,msg:'売り（手仕舞い）判定',cls:''});
     else if((e.sellAction||'').indexOf('警戒')===0) alerts.push({sym:h.sym,msg:'警戒（縮小）判定',cls:'warn'});
   });
+  const psHtml=pfSummaryHtml();
   const alHtml= getPortfolio().length? (alerts.length? alerts.map(a=>`<div class="hm-alert ${a.cls}" data-sym="${a.sym}">⚠️ <b>${a.sym}</b>　${a.msg}</div>`).join('') : `<div class="tiny muted">保有銘柄に警告はありません（継続保有）。</div>`) : `<div class="tiny muted">保有銘柄が未登録です。「保有」タブで追加できます。</div>`;
   box.innerHTML=
     `<div class="hm-sec">${mktHtml}${bkHtml}</div>`+
     `<div class="hm-sec"><div class="hm-h"><span>🗺 強いテーマ TOP3（${pLab}）</span><a href="#" data-go="theme">すべて見る →</a></div>${thHtml}</div>`+
     `<div class="hm-sec"><div class="hm-h"><span>🔎 買い候補 TOP5（スコア順）</span><a href="#" data-go="screen">すべて見る →</a></div>${buyHtml}</div>`+
-    `<div class="hm-sec"><div class="hm-h"><span>💼 保有の警告</span><a href="#" data-go="port">保有を見る →</a></div>${alHtml}</div>`;
+    `<div class="hm-sec"><div class="hm-h"><span>💼 保有</span><a href="#" data-go="port">保有を見る →</a></div>${psHtml?psHtml+'<div style=\"height:8px\"></div>':''}${alHtml}</div>`;
   box.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); showTab(el.dataset.go); }));
   box.querySelectorAll('[data-sym]').forEach(el=>el.addEventListener('click',()=>{ document.getElementById('symbol').value=el.dataset.sym; run(); }));
 }
