@@ -248,6 +248,14 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
 .thpill .thnums{flex:none;text-align:right;display:flex;gap:10px;align-items:baseline}
 .thpill a{color:var(--ac);font-weight:900;text-decoration:none}
 .thpill .co{color:var(--muted);font-weight:700;font-size:11px;margin-left:5px}
+.htgroup{margin-top:9px}
+.htlab{font-size:10.5px;color:var(--muted);font-weight:800;margin-bottom:4px}
+.htlab i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.htgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.httile{border-radius:8px;padding:7px 2px;text-align:center;cursor:pointer;display:flex;flex-direction:column;line-height:1.3}
+.httile b{font-size:11px;color:#fff}
+.httile span{font-size:9.5px;color:rgba(255,255,255,.88);font-weight:700}
+@media (max-width:420px){ .htgrid{grid-template-columns:repeat(4,1fr)} }
 .gloss{margin:10px 0 0}
 .gloss dt{font-weight:900;font-size:13px;color:var(--ac);margin-top:10px}
 .gloss dd{margin:2px 0 0;font-size:12.5px;font-weight:600;line-height:1.5;color:var(--tx)}
@@ -320,7 +328,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
       <button class="fbtn" onclick="setFont(-1)" aria-label="文字を小さく">A-</button>
       <button class="fbtn" onclick="setFont(1)" aria-label="文字を大きく">A+</button>
       <button class="fbtn" onclick="hardRefresh()" aria-label="最新に更新" title="キャッシュを消して最新に更新">🔄</button>
-      <div class="hs" style="text-align:right">v52<br><span id="build" style="font-weight:700"></span></div>
+      <div class="hs" style="text-align:right">v53<br><span id="build" style="font-weight:700"></span></div>
     </div>
   </div>
   <div class="navbar">
@@ -451,7 +459,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
         <button id="th-run" class="btn">📊 テーマ分析</button>
         <span class="tiny muted" id="th-status"></span>
       </div>
-      <div class="tiny muted" style="margin-top:4px">騰落率の期間は画面上部の「期間」で切替（テーマ一覧・チャート共通）。</div>
+      <div class="tiny muted" style="margin-top:4px">騰落率の期間は画面上部の「期間」で切替（テーマ一覧・チャート共通）。銘柄の追加・削除は各テーマを開いて編集（<a href="#" id="th-reset" style="color:var(--muted)">初期構成に戻す</a>）。</div>
       <div id="th-breakout" style="display:none;margin-top:12px">
         <div class="tiny muted" style="margin-bottom:6px"><b>📈 ブレイク・サマリー（取得済み全銘柄の勢い）</b></div>
         <div class="row" style="align-items:center;gap:8px;margin-bottom:8px">
@@ -464,6 +472,7 @@ canvas#ch-canvas{background:#0b1220;border:1px solid var(--bd);border-radius:12p
         <div class="tiny muted" id="th-bknote" style="margin-top:6px"></div>
       </div>
       <div id="th-map" style="display:none"></div>
+      <div id="th-heat" style="display:none;margin-top:12px"></div>
       <div id="th-body" style="margin-top:10px"><div class="tiny muted">「📊 テーマ分析」を押すと取得を開始します。</div></div>
     </details>
   </div>
@@ -1941,6 +1950,11 @@ const THEMES=[
   {name:'宇宙/防衛', cat:'宇宙・防衛', catc:'#4f46e5', syms:['RKLB','ASTS','LMT','KTOS','AVAV']},
   {name:'量子コンピュータ', cat:'量子', catc:'#c026d3', syms:['IONQ','RGTI','QBTS','QUBT']},
 ];
+const THEMES_DEFAULT=JSON.parse(JSON.stringify(THEMES));
+function saveThemes(){ try{ localStorage.setItem('themesCustom',JSON.stringify(THEMES)); }catch(e){} }
+function loadThemes(){ try{ const a=JSON.parse(localStorage.getItem('themesCustom')||'null');
+  if(Array.isArray(a)&&a.length&&a.every(t=>t&&t.name&&Array.isArray(t.syms))) THEMES.splice(0,THEMES.length,...a); }catch(e){} }
+function resetThemes(){ localStorage.removeItem('themesCustom'); THEMES.splice(0,THEMES.length,...JSON.parse(JSON.stringify(THEMES_DEFAULT))); }
 const NAMES={NVDA:'エヌビディア',AMD:'AMD',AVGO:'ブロードコム',MRVL:'マーベル',TSM:'TSMC',
   AMAT:'アプライド',LRCX:'ラムリサーチ',KLAC:'KLA',ASML:'ASML',TSEM:'タワーセミ',
   MU:'マイクロン',STX:'シーゲート',WDC:'ウエスタンデジタル',SNDK:'サンディスク',NTAP:'ネットアップ',
@@ -1978,6 +1992,8 @@ function storeLoad(){
 function fmtTs(ts){ if(!ts) return ''; const d=new Date(ts), p=x=>String(x).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 function themeUniq(){ return [...new Set(THEMES.flatMap(t=>t.syms))]; }
 function chgOf(d,bars){ const c=d.close,n=c.length-1,j=Math.max(0,n-bars); return j<n?(c[n]/c[j]-1)*100:null; }
+// back本前の時点での騰落率（ローテーション軌跡用）
+function chgAt(d,bars,back){ const c=d.close,n=c.length-1-back,j=n-bars; return (n>0&&j>=0)?(c[n]/c[j]-1)*100:null; }
 // 出来高変化率: 直近20日平均 ÷ その前20日平均 −1（%）
 function volChgOf(d){ const v=d.volume,n=v.length-1; if(n<41) return null;
   let a=0,b=0; for(let i=n-19;i<=n;i++) a+=v[i]; for(let i=n-39;i<=n-20;i++) b+=v[i];
@@ -2120,13 +2136,14 @@ function renderThemes(){
         `<div class="thright"><div class="thbig ${cl(r.avg)}">${sg(r.avg,0)}</div>`+
         `<div class="thday ${cl(r.day)}">1日 ${sg(r.day)}</div></div>`+
       `</div>`+
-      `<div class="thmeta2">20日線上 ${r.aboveN}/${r.n} ・ 🔥${r.hotN} ・ 出来高 ${volTxt}</div>`+
+      `<div class="thmeta2">20日線上 ${r.aboveN}/${r.n} ・ 🔥${r.hotN} ・ 出来高 ${volTxt} ・ 揃い ${r.upN}/${r.n}${(r.avg>0&&r.n>=3&&r.upN<=Math.floor(r.n/2))?'⚠️':''}</div>`+
       `<div class="thsparkwrap">${spkBlock(r.spark)}</div>`+
       `</div>`+
       `<div class="thdetail" id="thd-${idx}" style="display:none"></div>`;
   }).join('');
   box.querySelectorAll('.thcard').forEach(el=>el.addEventListener('click',()=>toggleThemeDetail(+el.dataset.i)));
   renderThemeMap();
+  renderHeatmap();
 }
 function toggleThemeDetail(idx){
   const r=__themeRows[idx], el=document.getElementById('thd-'+idx); if(!r||!el) return;
@@ -2140,7 +2157,8 @@ function toggleThemeDetail(idx){
   const spkBlock=sp=> sp?`<span class="spk-hi">+${sp.maxPct.toFixed(0)}%</span>${sp.svg}<span class="spk-lo">${sp.minPct>=0?'+':''}${sp.minPct.toFixed(0)}%</span><span class="spk-yr">1年</span>`:'';
   el.innerHTML=items.map((it,i)=>{
     if(it.err) return `<div class="thcard sub"><div class="thtop"><span class="thrank sub">${i+1}</span>`+
-      `<div class="thnamewrap"><span class="thname">${it.s}</span></div></div>`+
+      `<div class="thnamewrap"><span class="thname">${it.s}</span></div>`+
+      `<a href="#" class="sc-del thdel" data-sym="${it.s}">✕</a></div>`+
       `<div class="thmeta2">取得失敗: ${it.err}</div></div>`;
     return `<div class="thcard sub" data-sym="${it.s}">`+
       `<div class="thtop">`+
@@ -2149,13 +2167,35 @@ function toggleThemeDetail(idx){
         `${it.above?'<span class="thcat" style="background:#1f6feb">20MA上</span>':''}</div>`+
         `<div class="thright"><div class="thbig ${cl(it.chg)}">${sg(it.chg,0)}</div>`+
         `<div class="thday ${cl(it.day)}">1日 ${sg(it.day)}</div></div>`+
+        `<a href="#" class="sc-del thdel" data-sym="${it.s}">✕</a>`+
       `</div>`+
       `<div class="thmeta2">${NAMES[it.s]||''}</div>`+
       `<div class="thsparkwrap">${spkBlock(it.spark)}</div>`+
       `</div>`;
-  }).join('');
+  }).join('')+
+  `<div class="row" style="margin:10px 0 2px;align-items:center">`+
+  `<input class="t thadd-inp" placeholder="銘柄を追加 例 UBER" style="width:160px;min-height:38px"/>`+
+  `<button class="btn alt thadd-btn" style="min-height:38px;padding:8px 14px">＋追加</button>`+
+  `<span class="tiny muted">✕で削除。変更は保存されます</span></div>`;
   el.style.display='block';
-  el.querySelectorAll('.thcard.sub[data-sym]').forEach(c=>c.addEventListener('click',e=>{ e.stopPropagation(); document.getElementById('symbol').value=c.dataset.sym; run(); }));
+  el.querySelectorAll('.thcard.sub[data-sym]').forEach(c=>c.addEventListener('click',e=>{ if(e.target.closest('.thdel'))return; e.stopPropagation(); document.getElementById('symbol').value=c.dataset.sym; run(); }));
+  const themeRef=r.t;
+  const reopen=()=>{ const i2=__themeRows.findIndex(x=>x.t.name===themeRef.name); if(i2>=0) toggleThemeDetail(i2); };
+  el.querySelector('.thadd-inp').addEventListener('click',e=>e.stopPropagation());
+  el.querySelector('.thadd-inp').addEventListener('keydown',e=>{ if(e.key==='Enter') el.querySelector('.thadd-btn').click(); });
+  el.querySelector('.thadd-btn').addEventListener('click',e=>{ e.stopPropagation();
+    const inp=el.querySelector('.thadd-inp'); const sym=(inp.value||'').trim().toUpperCase();
+    if(!/^[A-Z][A-Z0-9.\-]{0,6}$/.test(sym)){ alert('ティッカーを入力してください（例 UBER）'); return; }
+    if(themeRef.syms.includes(sym)){ alert(sym+' は既にこのテーマにあります。'); return; }
+    themeRef.syms.push(sym); saveThemes();
+    if(!themeData[sym]){ const st=document.getElementById('th-status'); if(st) st.textContent=`${sym} を追加。データは「📊テーマ分析」または「🔄全体更新」で取得されます。`; }
+    renderThemes(); reopen();
+  });
+  el.querySelectorAll('.thdel').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation();
+    if(!confirm(a.dataset.sym+' をこのテーマから外しますか？')) return;
+    const ix=themeRef.syms.indexOf(a.dataset.sym); if(ix>=0) themeRef.syms.splice(ix,1);
+    saveThemes(); renderThemes(); reopen();
+  }));
 }
 
 /* ===== 保有サマリー（合計評価額・含み損益・今日の増減） ===== */
@@ -2187,13 +2227,17 @@ function renderThemeMap(){
   const box=document.getElementById('th-map'); if(!box) return;
   const rows=THEMES.map(t=>{ const ds=t.syms.map(s=>themeData[s]).filter(d=>d&&!d.err);
     const avgOf=fn=>{ const a=ds.map(fn).filter(x=>x!=null); return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; };
-    return {t, x:avgOf(d=>chgOf(d,5)), y:avgOf(d=>chgOf(d,63))};
-  }).filter(r=>r.x!=null&&r.y!=null);
+    const pt=b=>({x:avgOf(d=>chgAt(d,5,b)), y:avgOf(d=>chgAt(d,63,b))});
+    const trail=[pt(10),pt(5),pt(0)].filter(p=>p.x!=null&&p.y!=null);
+    return trail.length? {t, trail, x:trail[trail.length-1].x, y:trail[trail.length-1].y} : null;
+  }).filter(Boolean);
   if(!rows.length){ box.style.display='none'; return; }
   box.style.display='block';
   const W=360,H=280,pad=34;
-  const xm=Math.max(3,...rows.map(r=>Math.abs(r.x)))*1.3;
-  const ym=Math.max(5,...rows.map(r=>Math.abs(r.y)))*1.3;
+  const xs=rows.flatMap(r=>r.trail.map(p=>Math.abs(p.x)));
+  const ys=rows.flatMap(r=>r.trail.map(p=>Math.abs(p.y)));
+  const xm=Math.max(3,...xs)*1.3;
+  const ym=Math.max(5,...ys)*1.3;
   const X=v=>pad+(v+xm)/(2*xm)*(W-2*pad);
   const Y=v=>H-pad-(v+ym)/(2*ym)*(H-2*pad);
   let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:#0b1220;border:1px solid var(--bd);border-radius:12px">`;
@@ -2204,13 +2248,20 @@ function renderThemeMap(){
   const lab=(x,y,t,anch,col)=>`<text x="${x}" y="${y}" font-size="9.5" font-weight="800" fill="${col||'#7587a0'}" text-anchor="${anch}">${t}</text>`;
   svg+=lab(W-14,20,'👑 主導','end','#22c55e')+lab(18,20,'⚠️ 失速警戒','start','#f59e0b')+lab(W-14,H-14,'🌱 復活の芽','end','#38bdf8')+lab(18,H-14,'💤 出遅れ','start','#94a3b8');
   rows.forEach(r=>{
+    if(r.trail.length>1){ const col=r.t.catc||'#22c55e';
+      const pts=r.trail.map(p=>`${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+      svg+=`<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6" opacity="0.45"/>`;
+      r.trail.slice(0,-1).forEach(p=>{ svg+=`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2.4" fill="${col}" opacity="0.55"/>`; });
+    }
+  });
+  rows.forEach(r=>{
     const cx=X(r.x).toFixed(1), cy=Y(r.y).toFixed(1);
     svg+=`<g class="thmap-pt" data-name="${r.t.name}" style="cursor:pointer">`+
       `<circle cx="${cx}" cy="${cy}" r="7" fill="${r.t.catc||'#22c55e'}" stroke="rgba(255,255,255,.65)" stroke-width="1.2"/>`+
       `<text x="${cx}" y="${(+cy+17).toFixed(1)}" font-size="9" font-weight="800" fill="#c7d3e4" text-anchor="middle">${r.t.cat}</text></g>`;
   });
   svg+='</svg>';
-  box.innerHTML=`<div class="tiny muted" style="margin:12px 0 5px"><b style="color:var(--tx)">🧭 ローテーション・マップ</b>　横=1週・縦=3ヶ月の平均騰落率。右上=主導、左上=中期強いが直近失速、右下=直近から復活、左下=出遅れ。点タップでそのテーマへ。</div>`+svg;
+  box.innerHTML=`<div class="tiny muted" style="margin:12px 0 5px"><b style="color:var(--tx)">🧭 ローテーション・マップ</b>　横=1週・縦=3ヶ月の平均騰落率。しっぽ＝2週間の移動軌跡（小→大の順に現在へ）。右上=主導、左上=直近失速、右下=復活の芽、左下=出遅れ。点タップでそのテーマへ。</div>`+svg;
   box.querySelectorAll('.thmap-pt').forEach(g=>g.addEventListener('click',()=>{
     const i=__themeRows.findIndex(r=>r.t.name===g.dataset.name); if(i<0) return;
     const card=document.querySelector(`#th-body .thcard[data-i="${i}"]`);
@@ -2218,6 +2269,33 @@ function renderThemeMap(){
     if(det&&det.style.display!=='block') toggleThemeDetail(i);
     if(card) card.scrollIntoView({behavior:'smooth',block:'center'});
   }));
+}
+
+/* ===== 全銘柄ヒートマップ ===== */
+function renderHeatmap(){
+  const box=document.getElementById('th-heat'); if(!box) return;
+  const rows=__themeRows.length?__themeRows:computeThemeRows();
+  if(!rows.some(r=>r.n>0)){ box.style.display='none'; return; }
+  box.style.display='block';
+  const pLab=GPLABS[themePeriod]||'';
+  const all=[];
+  rows.forEach(r=>r.t.syms.forEach(sy=>{ const d=themeData[sy]; if(d&&!d.err){ const c=chgOf(d,themePeriod); if(c!=null) all.push(Math.abs(c)); } }));
+  all.sort((a,b)=>a-b);
+  const cap=Math.max(3, all[Math.floor(all.length*0.9)]||5);
+  let html=`<details open><summary class="csum">🧊 ヒートマップ <span class="tiny muted">（${pLab}騰落率・タップで個別判定）</span></summary>`;
+  rows.forEach(r=>{
+    const tiles=r.t.syms.map(sy=>{ const d=themeData[sy];
+      if(!d||d.err) return `<div class="httile" style="background:rgba(100,116,139,.20)"><b>${sy}</b><span>—</span></div>`;
+      const c=chgOf(d,themePeriod); if(c==null) return '';
+      const a=(0.16+0.74*Math.min(1,Math.abs(c)/cap)).toFixed(2);
+      const bg=c>=0?`rgba(22,163,74,${a})`:`rgba(220,38,38,${a})`;
+      return `<div class="httile" data-sym="${sy}" style="background:${bg}"><b>${sy}</b><span>${(c>=0?'+':'')+c.toFixed(1)}%</span></div>`;
+    }).join('');
+    html+=`<div class="htgroup"><div class="htlab"><i style="background:${r.t.catc||'#64748b'}"></i>${r.t.name}</div><div class="htgrid">${tiles}</div></div>`;
+  });
+  html+='</details>';
+  box.innerHTML=html;
+  box.querySelectorAll('.httile[data-sym]').forEach(el=>el.addEventListener('click',()=>{ document.getElementById('symbol').value=el.dataset.sym; run(); }));
 }
 
 /* ===== 大幅改訂(v51): 統合更新・ホーム画面・タブSPA ===== */
@@ -2228,6 +2306,7 @@ function computeThemeRows(){
     const avgOf=fn=>{ const a=ds.map(fn).filter(x=>x!=null); return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; };
     return {t, ds, n:ds.length, total:t.syms.length,
       avg:avgOf(d=>chgOf(d,themePeriod)), day:avgOf(d=>chgOf(d,1)), volc:avgOf(volChgOf),
+      upN:ds.filter(d=>{const c=chgOf(d,themePeriod); return c!=null&&c>0;}).length,
       aboveN:ds.filter(aboveMA20).length, hotN:ds.filter(near52h).length, spark:themeSparkRich(ds,252)};
   }).sort((a,b)=>(b.avg==null?-1e9:b.avg)-(a.avg==null?-1e9:a.avg));
 }
@@ -2634,6 +2713,9 @@ document.getElementById('pf-add').addEventListener('click',addHolding);
 document.getElementById('pf-refresh').addEventListener('click',refreshPortfolio);
 let _chRz; window.addEventListener('resize',()=>{ clearTimeout(_chRz); _chRz=setTimeout(()=>{ if(lastData) drawMiniChart(); },200); });
 document.getElementById('th-run').addEventListener('click',runThemes);
+document.getElementById('th-reset').addEventListener('click',e=>{ e.preventDefault();
+  if(!confirm('テーマ構成を初期状態に戻しますか？（追加/削除した変更は消えます）')) return;
+  resetThemes(); renderThemes(); renderHome(); });
 document.getElementById('add-pf').addEventListener('click',addCurrentToPortfolio);
 document.getElementById('add-wl').addEventListener('click',addCurrentToWatch);
 // 共通の期間セレクタ（テーマ一覧＋チャートに連動）
@@ -2710,6 +2792,8 @@ document.getElementById('tdkey').addEventListener('input',e=>{
   // 共通の期間を復元（テーマ一覧＋チャート連動）
   try{ const gp=parseInt(localStorage.getItem('gperiod'),10); if(GPLABS[gp]){ gPeriod=gp; themePeriod=gp; chartBars=gp; } }catch(e){}
   document.querySelectorAll('#global-period button').forEach(x=>x.classList.toggle('on',+x.dataset.b===gPeriod));
+  // カスタムテーマ構成を復元
+  loadThemes();
   // ★統合ストアを復元（テーマ/ウォッチ/保有で共用・再取得は確認後のみ）
   storeLoad();
   // 前回のスクリーニング結果を復元（系列はストアから再接続→フィルター即反映）
